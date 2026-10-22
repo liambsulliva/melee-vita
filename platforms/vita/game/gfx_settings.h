@@ -20,7 +20,14 @@ typedef struct GfxSettings {
     /* not part of any preset: */
     int show_fps;
     int heavy30;      /* 3+ players or Fountain of Dreams: lock that match to 30 */
+    int unlock_all;   /* every character and stage, never saved to the card */
+    int tournament;   /* competitive VS rules the first time VS opens each boot */
+    int stage_lite;   /* per-stage cutbacks, bit i = gfx_stages[i] */
 } GfxSettings;
+
+/* Legal stages that have a cutback switch (stage_lite bits). */
+#define GFX_STAGE_COUNT 6
+extern const struct GfxStage { int kind; const char* name; } gfx_stages[GFX_STAGE_COUNT];
 
 /* 30 fps lock: game logic still runs at 60 Hz, every 2nd tick is drawn and
  * each frame stays up for exactly 2 refreshes. */

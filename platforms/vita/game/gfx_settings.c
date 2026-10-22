@@ -32,6 +32,30 @@ extern int g_melee_vita_min_ticks; // gmscene.c, logic ticks per drawn frame
 
 GfxSettings g_gfx;
 GfxSettings g_gfx_custom;
+
+// StKind values (src/melee/gr/forward.h)
+const struct GfxStage gfx_stages[GFX_STAGE_COUNT] = {
+    { 0x1F, "Battlefield" },
+    { 0x20, "Final Destination" },
+    { 0x08, "Yoshi's Story" },
+    { 0x03, "Pokemon Stadium" },
+    { 0x02, "Fountain of Dreams" },
+    { 0x1C, "Dream Land N64" },
+};
+
+extern int g_melee_vita_unlock_all;           // pc_stubs.c
+int g_melee_vita_tournament_rules;            // read by gmvsmelee.c
+extern int g_melee_vita_skip_stage_particles; // gx.c, read by psdisp.c
+
+// options that aren't part of any preset: copied across when presets change
+static void copy_extras(GfxSettings* dst, const GfxSettings* src)
+{
+    dst->show_fps = src->show_fps;
+    dst->heavy30 = src->heavy30;
+    dst->unlock_all = src->unlock_all;
+    dst->tournament = src->tournament;
+    dst->stage_lite = src->stage_lite;
+}
 int g_gfx_preset = GFX_PRESET_PERFORMANCE;
 
 static const char* preset_names[] = { "PERFORMANCE", "QUALITY", "CUSTOM" };
@@ -69,8 +93,7 @@ int gfx_settings_match(const GfxSettings* s)
     for (int p = 0; p < GFX_PRESET_CUSTOM; p++) {
         GfxSettings v;
         gfx_settings_preset(&v, p);
-        v.show_fps = s->show_fps; // these two aren't part of a preset
-        v.heavy30 = s->heavy30;
+        copy_extras(&v, s); // not part of a preset
         if (memcmp(&v, s, sizeof(v)) == 0) return p;
     }
     return GFX_PRESET_CUSTOM;
@@ -81,15 +104,13 @@ void gfx_settings_changed(void)
 {
     g_gfx_preset = gfx_settings_match(&g_gfx);
     if (g_gfx_preset == GFX_PRESET_CUSTOM) g_gfx_custom = g_gfx;
-    g_gfx_custom.show_fps = g_gfx.show_fps;
-    g_gfx_custom.heavy30 = g_gfx.heavy30;
+    copy_extras(&g_gfx_custom, &g_gfx);
 }
 
 // preset row: load that preset's values (Custom brings back the user's own)
 void gfx_settings_select(int preset)
 {
-    g_gfx_custom.show_fps = g_gfx.show_fps;
-    g_gfx_custom.heavy30 = g_gfx.heavy30;
+    copy_extras(&g_gfx_custom, &g_gfx);
     gfx_settings_resolve(&g_gfx, preset, &g_gfx_custom);
     g_gfx_preset = preset;
 }
@@ -101,8 +122,7 @@ void gfx_settings_resolve(GfxSettings* out, int preset, const GfxSettings* custo
         return;
     }
     gfx_settings_preset(out, preset);
-    out->show_fps = custom->show_fps; // not part of a preset
-    out->heavy30 = custom->heavy30;
+    copy_extras(out, custom); // not part of a preset
 }
 
 const char* gfx_settings_preset_name(int preset)
@@ -144,6 +164,9 @@ static void clamp_settings(GfxSettings* s)
     s->vsync = s->vsync != 0;
     s->show_fps = s->show_fps != 0;
     s->heavy30 = s->heavy30 != 0;
+    s->unlock_all = s->unlock_all != 0;
+    s->tournament = s->tournament != 0;
+    s->stage_lite &= (1 << GFX_STAGE_COUNT) - 1;
     if (s->frame_rate != FRAME_RATE_30) s->frame_rate = FRAME_RATE_60;
 }
 
@@ -183,6 +206,17 @@ void gfx_settings_load(void)
         else if (!strcmp(name, "frame_rate"))
             c->frame_rate = val > 0 && val <= 30 ? FRAME_RATE_30 : FRAME_RATE_60;
         else if (!strcmp(name, "lock_30_big_matches")) c->heavy30 = val;
+        else if (!strcmp(name, "unlock_everything")) c->unlock_all = val;
+        else if (!strcmp(name, "tournament_rules")) c->tournament = val;
+        else if (!strncmp(name, "lite_", 5)) {
+            // lite_<stage kind in hex>=1
+            int kind = (int) strtol(name + 5, NULL, 16);
+            for (int i = 0; i < GFX_STAGE_COUNT; i++)
+                if (gfx_stages[i].kind == kind) {
+                    if (val) c->stage_lite |= 1 << i;
+                    else c->stage_lite &= ~(1 << i);
+                }
+        }
     }
     fclose(f);
     clamp_settings(c);
@@ -217,6 +251,13 @@ bool gfx_settings_save(void)
     fprintf(f, "frame_rate=%d\n", c->frame_rate == FRAME_RATE_30 ? 30 : 60);
     fprintf(f, "# 30 fps for matches with 3-4 players or on Fountain of Dreams\n");
     fprintf(f, "lock_30_big_matches=%d\n", c->heavy30);
+    fprintf(f, "unlock_everything=%d\n", c->unlock_all);
+    fprintf(f, "# 4 stocks, 8 minutes, items off, team attack on, pause off, legal stages\n");
+    fprintf(f, "tournament_rules=%d\n", c->tournament);
+    fprintf(f, "# stage cutbacks (1 = on): hide the stage's own background particles\n");
+    for (int i = 0; i < GFX_STAGE_COUNT; i++)
+        fprintf(f, "lite_%02x=%d   # %s\n", (unsigned) gfx_stages[i].kind,
+                (c->stage_lite >> i) & 1, gfx_stages[i].name);
     ok = fclose(f) == 0;
     if (ok) {
         remove(GFX_PATH);
@@ -240,6 +281,11 @@ static void set_fps30(int on)
 // decided once when the match starts, so the frame rate never changes mid-match
 void melee_vita_match_begin(int players, int stage_kind)
 {
+    g_melee_vita_skip_stage_particles = 0;
+    for (int i = 0; i < GFX_STAGE_COUNT; i++)
+        if (gfx_stages[i].kind == stage_kind && (g_gfx.stage_lite >> i) & 1)
+            g_melee_vita_skip_stage_particles = 1;
+
     if (!g_gfx.heavy30 || g_gfx.frame_rate == FRAME_RATE_30) return;
     set_fps30(players >= 3 || stage_kind == 0x02 /* Fountain of Dreams */);
     melee_vita_log_info("[GFX] match: %d players, stage 0x%02x -> %s fps", players, stage_kind,
@@ -248,6 +294,7 @@ void melee_vita_match_begin(int players, int stage_kind)
 
 void melee_vita_match_end(void)
 {
+    g_melee_vita_skip_stage_particles = 0;
     set_fps30(g_gfx.frame_rate == FRAME_RATE_30); // menus go back to the setting
 }
 
@@ -255,6 +302,8 @@ void gfx_settings_apply(void)
 {
     g_melee_vita_particle_limit = (u32) g_gfx.particles;
     g_melee_vita_copy_interval = (u32) g_gfx.live_screens;
+    g_melee_vita_unlock_all = g_gfx.unlock_all;
+    g_melee_vita_tournament_rules = g_gfx.tournament;
     set_fps30(g_gfx.frame_rate == FRAME_RATE_30);
 
     // off = leave whatever the system gave us

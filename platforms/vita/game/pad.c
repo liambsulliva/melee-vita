@@ -384,6 +384,16 @@ bool melee_vita_pad_set_mapping(int physical_button, int action)
     return true;
 }
 
+// LiveArea settings screen: save a whole mapping at once
+bool melee_vita_pad_replace_mapping(const uint8_t mapping[MELEE_VITA_BUTTON_COUNT])
+{
+    if (!melee_vita_pad_mapping_valid(mapping))
+        return false;
+    memcpy(s_mapping, mapping, sizeof(s_mapping));
+    pad_config_save();
+    return true;
+}
+
 void melee_vita_pad_reset_mapping(void)
 {
     melee_vita_pad_mapping_defaults(s_mapping);

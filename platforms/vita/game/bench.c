@@ -48,6 +48,8 @@ typedef struct {
     u32 audio_us;  // audio mixing done on the game thread
     u32 cls_us[6]; // object drawing by class, see cls_names
     u32 cls_draws[6]; // draw calls made by each class
+    u32 rt_us;     // render thread time (recording GXM commands)
+    u32 gpu_us;    // render thread start -> GPU finished the frame
     u32 counts[5]; // see count_names
 } Row;
 
@@ -76,6 +78,7 @@ typedef struct {
     float game_speed;             // logic ticks per second, 60 = full speed
     float update_ms, render_ms, wait_ms;
     float drain_ms, audio_ms, cls_ms[6], cls_draws[6], counts[5];
+    float rt_ms, gpu_ms, gpu_max_ms; // headroom: compare with 16.7 / 33.3
     int hist[6];
     // what the screen actually showed (from the display callback)
     u32 shown[4];  // frames that stayed up 1, 2, 3, 4+ refreshes
@@ -91,6 +94,8 @@ extern u64 g_melee_vita_update_total_us;  // gmscene.c
 extern u64 g_melee_vita_render_total_us;  // gmscene.c
 extern u64 g_melee_vita_audio_mix_total_us; // audio.c
 extern u32 g_melee_vita_gx_counts[5];       // gx.c
+extern volatile u32 g_melee_vita_rt_busy_us;  // gxm_game.c
+extern volatile u32 g_melee_vita_gpu_done_us; // gxm_game.c
 
 // gobj.c times object draws by class while this is set
 int g_melee_vita_bench_prof;
@@ -141,6 +146,8 @@ static void compute_stats(const Row* r, int n, Stats* s)
 {
     static u32 sorted[MAX_ROWS];
     double total = 0, sq = 0, jit = 0, upd = 0, ren = 0, wai = 0, dra = 0, aud = 0;
+    double rt = 0, gpu = 0;
+    u32 gpu_max = 0;
     double cls[6] = { 0 }, cls_d[6] = { 0 }, cnt[5] = { 0 };
     u32 ticks = 0;
     int o17 = 0, o25 = 0, o34 = 0;
@@ -159,6 +166,9 @@ static void compute_stats(const Row* r, int n, Stats* s)
         ren += r[i].render_us;
         wai += r[i].wait_us;
         dra += r[i].drain_us;
+        rt += r[i].rt_us;
+        gpu += r[i].gpu_us;
+        if (r[i].gpu_us > gpu_max) gpu_max = r[i].gpu_us;
         aud += r[i].audio_us;
         for (int c = 0; c < 6; c++) cls[c] += r[i].cls_us[c];
         for (int c = 0; c < 6; c++) cls_d[c] += r[i].cls_draws[c];
@@ -194,6 +204,9 @@ static void compute_stats(const Row* r, int n, Stats* s)
     s->render_ms = (float) (fmax(0.0, ren - wai) / n / 1000.0); // without the wait
     s->wait_ms = (float) (wai / n / 1000.0);
     s->drain_ms = (float) (dra / n / 1000.0);
+    s->rt_ms = (float) (rt / n / 1000.0);
+    s->gpu_ms = (float) (gpu / n / 1000.0);
+    s->gpu_max_ms = gpu_max / 1000.0f;
     s->audio_ms = (float) (aud / n / 1000.0);
     for (int c = 0; c < 6; c++) s->cls_ms[c] = (float) (cls[c] / n / 1000.0);
     for (int c = 0; c < 6; c++) s->cls_draws[c] = (float) (cls_d[c] / n);
@@ -217,7 +230,7 @@ static void write_csv_rows(void)
     if (nresults == 0)
         fprintf(f, "stage,frame,frame_ms,ticks,logic_ms,draw_ms,wait_ms,submit_wait_ms,audio_ms,"
                    "fighters_ms,items_ms,stage_ms,effects_ms,hud_ms,other_ms,"
-                   "gpu_draws,cpu_draws,dl_builds,dl_rebuilds,dl_fallbacks\n");
+                   "gpu_draws,cpu_draws,dl_builds,dl_rebuilds,dl_fallbacks,render_thread_ms,gpu_ms\n");
     for (int i = 0; i < nrows; i++) {
         const Row* r = &rows[i];
         u32 draw = r->render_us > r->wait_us ? r->render_us - r->wait_us : 0;
@@ -226,7 +239,7 @@ static void write_csv_rows(void)
                 draw / 1000.0, r->wait_us / 1000.0, r->drain_us / 1000.0, r->audio_us / 1000.0);
         for (int c = 0; c < 6; c++) fprintf(f, ",%.2f", r->cls_us[c] / 1000.0);
         for (int c = 0; c < 5; c++) fprintf(f, ",%u", (unsigned) r->counts[c]);
-        fprintf(f, "\n");
+        fprintf(f, ",%.2f,%.2f\n", r->rt_us / 1000.0, r->gpu_us / 1000.0);
     }
     fclose(f);
 }
@@ -278,11 +291,12 @@ static void write_summary(void)
         fprintf(f, "\n");
     }
 
-    fprintf(f, "\nGame thread time per frame (ms)\n%-19s %8s %8s %8s\n", "stage", "logic",
-            "draw", "wait");
+    fprintf(f, "\nTime per frame (ms)\n%-19s %8s %8s %8s %10s %8s %8s\n", "stage", "logic",
+            "draw", "wait", "render thr", "gpu", "gpu max");
     for (int i = 0; i < nresults; i++)
-        fprintf(f, "%-19s %8.2f %8.2f %8.2f\n", stages[i].name, results[i].update_ms,
-                results[i].render_ms, results[i].wait_ms);
+        fprintf(f, "%-19s %8.2f %8.2f %8.2f %10.2f %8.2f %8.2f\n", stages[i].name,
+                results[i].update_ms, results[i].render_ms, results[i].wait_ms, results[i].rt_ms,
+                results[i].gpu_ms, results[i].gpu_max_ms);
 
     fprintf(f, "\nScreen pacing (frames counted at the display flip)\n"
                "%-19s %6s %8s %8s %8s %8s %8s %9s\n", "stage", "target", "1 vbl", "2 vbl",
@@ -336,6 +350,11 @@ static void write_summary(void)
                "  actually stayed on screen. smooth = %% of frames that stayed up\n"
                "  exactly as long as they should (1 at 60 fps, 2 at 30). Dropped\n"
                "  frames were replaced before they were shown (v-sync off).\n"
+               "- render thr: render thread time recording GPU commands for a frame.\n"
+               "- gpu: from the render thread starting a frame until the GPU has\n"
+               "  finished it. Below 16.7 ms (60 fps) or 33.3 ms (30 fps) there is\n"
+               "  room for a higher resolution. Exact at 60 fps with v-sync off; with\n"
+               "  v-sync or the 30 fps lock it also counts time waiting to be shown.\n"
                "- audio: mixing sound on the game thread (inside draw).\n"
                "- submit: waiting for the GX submit worker thread at the end of\n"
                "  the frame (inside draw).\n"
@@ -507,6 +526,8 @@ void melee_vita_bench_frame(u32 sync_wait_us, u32 drain_us)
         r->update_us = (u32) (upd - last_update);
         r->wait_us = sync_wait_us;
         r->drain_us = drain_us;
+        r->rt_us = g_melee_vita_rt_busy_us;
+        r->gpu_us = g_melee_vita_gpu_done_us;
         r->audio_us = (u32) (aud - last_audio);
         memcpy(r->cls_us, cur_cls_us, sizeof(cur_cls_us));
         memcpy(r->cls_draws, cur_cls_draws, sizeof(cur_cls_draws));
@@ -547,7 +568,7 @@ static void draw_results(vita2d_pgf* font)
                                    "logic ms", "draw ms", "fps lock", "smooth" };
     // table 2: where the draw ms go
     static const int cols2[] = { 40, 230, 315, 400, 490, 575, 660, 745, 840 };
-    static const char* heads2[] = { "draw ms ->", "audio", "submit", "fighters", "items",
+    static const char* heads2[] = { "draw ms ->", "audio", "gpu ms", "fighters", "gpu max",
                                     "stage", "effects", "hud", "draws" };
     char text[160];
     int y;
@@ -588,10 +609,11 @@ static void draw_results(vita2d_pgf* font)
         vita2d_pgf_draw_text(font, cols2[0], y, white, 0.8f, stages[i].name);
         snprintf(text, sizeof(text), "%.1f", s->audio_ms);
         vita2d_pgf_draw_text(font, cols2[1], y, white, 0.8f, text);
-        snprintf(text, sizeof(text), "%.1f", s->drain_ms);
+        snprintf(text, sizeof(text), "%.1f", s->gpu_ms);
         vita2d_pgf_draw_text(font, cols2[2], y, white, 0.8f, text);
         for (int c = 0; c < 5; c++) {
-            snprintf(text, sizeof(text), "%.1f", s->cls_ms[c]);
+            // items (always ~0) gives its column to the worst gpu time
+            snprintf(text, sizeof(text), "%.1f", c == 1 ? s->gpu_max_ms : s->cls_ms[c]);
             vita2d_pgf_draw_text(font, cols2[c + 3], y, white, 0.8f, text);
         }
         // draw calls per frame (gpu + cpu)
@@ -599,7 +621,7 @@ static void draw_results(vita2d_pgf* font)
         vita2d_pgf_draw_text(font, cols2[8], y, white, 0.8f, text);
     }
     vita2d_pgf_draw_text(font, 40, 455, grey, 0.7f,
-                         "smooth = frames that stayed on screen exactly as long as they should; audio = sound mixing on the game thread");
+                         "smooth = frames shown exactly as long as they should; gpu = render start to GPU done (headroom vs 16.7 ms)");
     snprintf(text, sizeof(text), "Full report: " BENCH_DIR "/bench-%03d.txt (and .csv)    Press any button to close",
              report_num);
     vita2d_pgf_draw_text(font, 40, 490, grey, 0.75f, text);

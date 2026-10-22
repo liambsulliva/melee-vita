@@ -111,6 +111,14 @@ static u32 s_render_height = MELEE_VITA_DISPLAY_HEIGHT;
 
 #define VITA_MAIN_SCENES_PER_FRAME 8u
 
+/* Benchmark: when the render thread started each frame, read back by the
+ * display callback once the GPU has finished that frame (frames reach the
+ * display queue in order). */
+static volatile u64 s_rt_start[8];
+static volatile u32 s_rt_head, s_rt_tail;
+volatile u32 g_melee_vita_rt_busy_us;  // render thread time for the last frame
+volatile u32 g_melee_vita_gpu_done_us; // render start -> GPU done, last frame
+
 /* vita2d's display callback calls sceDisplayWaitVblankStart right after
  * queueing each flip (vblank wait is always on, see melee_vita_gxm_init).
  * - 30 fps lock: wait 2 vblanks so every frame stays up for 2 refreshes
@@ -123,6 +131,12 @@ int __wrap_sceDisplayWaitVblankStart(void)
 {
     // the LiveArea settings screen draws with vita2d before the game starts
     if (!s_initialized) return __real_sceDisplayWaitVblankStart();
+    // GXM calls the display callback once the GPU has finished the frame
+    if (s_rt_tail != __atomic_load_n(&s_rt_head, __ATOMIC_ACQUIRE)) {
+        g_melee_vita_gpu_done_us =
+            (u32) (sceKernelGetProcessTimeWide() - s_rt_start[s_rt_tail & 7u]);
+        s_rt_tail++;
+    }
     melee_vita_bench_flip((u32) sceDisplayGetVcount(), g_melee_vita_fps30_active ? 2u : 1u);
     if (g_melee_vita_fps30_active) return sceDisplayWaitVblankStartMulti(2);
     if (g_gfx.vsync) return __real_sceDisplayWaitVblankStart();
@@ -911,6 +925,8 @@ static int render_thread(SceSize args, void* argp)
         if (s_rq_quit) break;
         frame = s_exec_frame;
         t0 = sceKernelGetProcessTimeWide();
+        s_rt_start[s_rt_head & 7u] = t0;
+        __atomic_add_fetch(&s_rt_head, 1u, __ATOMIC_RELEASE);
         s_rt_split_frame = rq_frame_splits(frame);
         rt_begin_scene(frame->clear_color, 1);
         while (offset < frame->size) {
@@ -919,7 +935,11 @@ static int render_thread(SceSize args, void* argp)
             command->exec(frame->cmds + offset);
             offset += command->size;
         }
-        melee_vita_prof_add(VPZ_RT_EXEC, sceKernelGetProcessTimeWide() - t0);
+        {
+            const u64 busy = sceKernelGetProcessTimeWide() - t0;
+            melee_vita_prof_add(VPZ_RT_EXEC, busy);
+            g_melee_vita_rt_busy_us = (u32) busy;
+        }
         sceKernelSignalSema(s_rq_done, 1);
     }
     sceKernelSignalSema(s_rq_done, 1);
@@ -979,6 +999,11 @@ void* melee_vita_rq_push_direct(MeleeVitaRqExec exec, u32 payload_size)
     const u32 needed = frame->size + sizeof(RqCommand) + aligned;
     RqCommand* command;
     if (!s_initialized) return NULL;
+    // without the submit worker the game thread records here directly
+    if (!gxs_active()) {
+        extern void gx_batch_flush(void);
+        gx_batch_flush();
+    }
     if (needed > frame->capacity) {
         u32 capacity = frame->capacity ? frame->capacity : 1u << 20;
         u8* grown;

@@ -109,8 +109,47 @@ void gmVsMelee_ResetKOCounts(void)
     memzero(&ko_counts, sizeof(ko_counts));
 }
 
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+#include "gm_1601.h"
+/* Vita settings, "Tournament rules": the first time VS mode opens after
+ * boot, set the VS rules to the usual competitive ruleset. They're normal
+ * rules after that, so the Rules menu can still change them. */
+extern int g_melee_vita_tournament_rules;
+static void vita_tournament_rules(void)
+{
+    // Battlefield, Final Destination, Yoshi's Story, Pokemon Stadium,
+    // Fountain of Dreams, Dream Land N64 (StKind)
+    static const u16 legal[] = { 0x1F, 0x20, 0x08, 0x03, 0x02, 0x1C };
+    static int done;
+    GameRules* rules;
+    int i, j;
+    if (!g_melee_vita_tournament_rules || done) return;
+    done = 1;
+    rules = gmMainLib_GetGameRules();
+    rules->mode = 1;             // stock
+    rules->stock_count = 4;
+    rules->stock_time_limit = 8; // minutes
+    rules->handicap = 0;
+    rules->damage_ratio = 10;    // 1.0x
+    rules->friendly_fire = 1;    // team attack on
+    rules->pause = 0;
+    gmMainLib_GetGamePrefs()->item_freq = 0xFF; // items: none
+    // random stage only picks the legal stages that are unlocked
+    for (i = 0; i < 0x1D; i++) {
+        u16 kind = gm_801641CC((u8) i);
+        bool on = false;
+        for (j = 0; j < (int) ARRAY_SIZE(legal); j++)
+            if (kind == legal[j] && gm_80164430(kind)) on = true;
+        gm_801641E4((u8) i, on);
+    }
+}
+#endif
+
 void gmVsMelee_Mode_OnLoad(void)
 {
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+    vita_tournament_rules();
+#endif
     gmVsMelee_ResetKOCounts();
 }
 

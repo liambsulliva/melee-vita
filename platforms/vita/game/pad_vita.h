@@ -15,5 +15,6 @@ int melee_vita_pad_get_physical_button_for_action(int action);
 int melee_vita_pad_physical_button_from_raw(uint32_t raw_buttons);
 bool melee_vita_pad_set_mapping(int physical_button, int action);
 void melee_vita_pad_reset_mapping(void);
+bool melee_vita_pad_replace_mapping(const uint8_t mapping[MELEE_VITA_BUTTON_COUNT]);
 
 #endif
