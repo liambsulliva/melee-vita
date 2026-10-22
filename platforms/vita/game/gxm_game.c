@@ -1099,6 +1099,20 @@ bool melee_vita_gxm_apply_resolution_options(void)
 }
 #endif
 
+/* Per-match gameplay resolution (potato Fountain of Dreams). -1 goes back to
+ * the setting. Called when a match starts or ends, so waiting for the render
+ * thread here costs nothing anyone sees. */
+void melee_vita_gxm_match_gameplay_res(int option)
+{
+    if (!s_initialized) return;
+    if (option < 0) option = g_gfx.game_res;
+    if (option == s_gameplay_resolution_option) return;
+    rq_wait_idle();
+    vita2d_wait_rendering_done();
+    if (!resolution_target_create(option)) return;
+    s_gameplay_resolution_option = option;
+}
+
 int melee_vita_gxm_init(void)
 {
     int result;

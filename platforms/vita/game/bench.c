@@ -32,9 +32,10 @@ static const struct {
     { 0x20, "Final Destination" },
     { 0x08, "Yoshi's Story" },
     { 0x03, "Pokemon Stadium" },
-    // TODO: Fountain of Dreams (0x02) crashed on hardware when its match
-    // ended, before the next stage loaded. Left out until that's found.
     { 0x1C, "Dream Land N64" },
+    // Last on purpose: leaving Fountain of Dreams for the next stage crashed
+    // once on hardware. Its results are saved before the match ends.
+    { 0x02, "Fountain of Dreams" },
 };
 #define STAGE_COUNT ((int) (sizeof(stages) / sizeof(stages[0])))
 
@@ -122,6 +123,12 @@ static u64 last_update, last_render, last_audio;
 static u32 last_counts[5];
 
 static Stats results[STAGE_COUNT];
+
+// stage drawing by stage part (map gobj index), summed over the stage
+#define MAX_PARTS 64
+static u64 part_us[MAX_PARTS];
+static u32 part_draws[MAX_PARTS];
+static struct { int part; float ms, draws; } top_parts[STAGE_COUNT][6];
 static int nresults;
 
 /* ---- stats ---- */
@@ -329,6 +336,16 @@ static void write_summary(void)
         fprintf(f, "\n");
     }
 
+    fprintf(f, "\nMost expensive stage parts (part #: ms per frame / draw calls)\n");
+    for (int i = 0; i < nresults; i++) {
+        fprintf(f, "%-19s", stages[i].name);
+        for (int k = 0; k < 6; k++)
+            if (top_parts[i][k].part >= 0)
+                fprintf(f, "  #%d: %.2f/%.0f", top_parts[i][k].part, top_parts[i][k].ms,
+                        top_parts[i][k].draws);
+        fprintf(f, "\n");
+    }
+
     fprintf(f, "\nGX work per frame\n%-19s", "stage");
     for (int c = 0; c < 5; c++) fprintf(f, " %16s", count_names[c]);
     fprintf(f, "\n");
@@ -434,6 +451,13 @@ void melee_vita_bench_flip(u32 vcount, u32 target)
     flip_last = vcount;
 }
 
+void melee_vita_bench_stage_part(int part, u64 us, u32 draws)
+{
+    if (!recording || part < 0 || part >= MAX_PARTS) return;
+    part_us[part] += us;
+    part_draws[part] += draws;
+}
+
 void melee_vita_bench_gobj(unsigned int classifier, u64 us, u32 draws)
 {
     cur_cls_us[cls_bucket(classifier)] += (u32) us;
@@ -457,6 +481,20 @@ static void finish_stage(void)
         total += flip_shown[i];
         flip_shown[i] = 0;
     }
+    // the 6 most expensive stage parts
+    for (int k = 0; k < 6; k++) {
+        int best = -1;
+        for (int p = 0; p < MAX_PARTS; p++)
+            if (part_us[p] && (best < 0 || part_us[p] > part_us[best])) best = p;
+        top_parts[nresults][k].part = best;
+        if (best >= 0 && nrows > 0) {
+            top_parts[nresults][k].ms = part_us[best] / 1000.0f / nrows;
+            top_parts[nresults][k].draws = (float) part_draws[best] / nrows;
+            part_us[best] = 0; // so the next pick is a different part
+        }
+    }
+    memset(part_us, 0, sizeof(part_us));
+    memset(part_draws, 0, sizeof(part_draws));
     s->dropped = flip_dropped;
     s->target = (int) flip_target;
     s->smooth = total ? 100.0f * s->shown[s->target == 2 ? 1 : 0] / total : 0.0f;
@@ -475,9 +513,12 @@ int melee_vita_bench_match_tick(u32 frame, int cancel)
     cur_frame = frame;
 
     if (cancel) {
+        // only if this stage got past its warm-up (rows still hold the
+        // previous stage otherwise)
+        int was_recording = recording;
         recording = 0;
         g_melee_vita_bench_prof = 0;
-        if (nrows > 60) finish_stage();
+        if (was_recording && nrows > 60) finish_stage();
         cancelled = 1;
         done = 1;
         done_at = sceKernelGetProcessTimeWide();
@@ -622,9 +663,36 @@ static void draw_results(vita2d_pgf* font)
     }
     vita2d_pgf_draw_text(font, 40, 455, grey, 0.7f,
                          "smooth = frames shown exactly as long as they should; gpu = render start to GPU done (headroom vs 16.7 ms)");
-    snprintf(text, sizeof(text), "Full report: " BENCH_DIR "/bench-%03d.txt (and .csv)    Press any button to close",
+    snprintf(text, sizeof(text), "Report: " BENCH_DIR "/bench-%03d.txt    Square: stage parts    Other: close",
              report_num);
     vita2d_pgf_draw_text(font, 40, 490, grey, 0.75f, text);
+}
+
+// second results page: which parts of each stage cost the most to draw
+static void draw_parts(vita2d_pgf* font)
+{
+    char text[160];
+    u32 white = RGBA8(240, 240, 240, 255), grey = RGBA8(170, 170, 170, 255);
+    int y = 110;
+
+    vita2d_draw_rectangle(20, 20, 920, 504, RGBA8(0, 0, 0, 225));
+    snprintf(text, sizeof(text), "Benchmark %03d: most expensive stage parts", report_num);
+    vita2d_pgf_draw_text(font, 40, 52, RGBA8(255, 210, 60, 255), 1.0f, text);
+    vita2d_pgf_draw_text(font, 40, 80, grey, 0.75f,
+                         "part #: ms per frame / draw calls      (stage parts = the stage's own models)");
+    for (int i = 0; i < nresults; i++) {
+        int n = 0;
+        vita2d_pgf_draw_text(font, 40, y, white, 0.85f, stages[i].name);
+        text[0] = 0;
+        for (int k = 0; k < 6; k++) {
+            if (top_parts[i][k].part < 0) continue;
+            n += snprintf(text + n, sizeof(text) - n, "#%d: %.2f / %.0f    ", top_parts[i][k].part,
+                          top_parts[i][k].ms, top_parts[i][k].draws);
+        }
+        vita2d_pgf_draw_text(font, 60, y + 24, white, 0.8f, text);
+        y += 58;
+    }
+    vita2d_pgf_draw_text(font, 40, 490, grey, 0.75f, "Square: back to the results    Other buttons: close");
 }
 
 void melee_vita_bench_draw(void)
@@ -635,12 +703,20 @@ void melee_vita_bench_draw(void)
     if (!active || !font) return;
 
     if (done) {
+        static u32 old_buttons;
+        static int parts_page;
         SceCtrlData pad;
-        draw_results(font);
-        // close after a button press, but not before it was up for 3 s
+        u32 pressed;
+        if (parts_page) draw_parts(font);
+        else draw_results(font);
+        // Square flips to the stage parts page; anything else closes, but
+        // not before the results were up for 3 s
         memset(&pad, 0, sizeof(pad));
         sceCtrlPeekBufferPositive(0, &pad, 1);
-        if (pad.buttons && sceKernelGetProcessTimeWide() - done_at > 3000000u)
+        pressed = pad.buttons & ~old_buttons;
+        old_buttons = pad.buttons;
+        if (pressed & SCE_CTRL_SQUARE) parts_page = !parts_page;
+        else if (pressed && sceKernelGetProcessTimeWide() - done_at > 3000000u)
             active = 0;
         return;
     }

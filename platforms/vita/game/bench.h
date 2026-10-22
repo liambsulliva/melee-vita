@@ -29,6 +29,8 @@ void melee_vita_bench_flip(u32 vcount, u32 target);
 /* render thread: banner while running, results once done */
 int melee_vita_bench_wants_overlay(void);
 void melee_vita_bench_draw(void);
+/* grdisplay.c: stage drawing time by stage part (map gobj index) */
+void melee_vita_bench_stage_part(int part, u64 us, u32 draws);
 
 /* settings_app.c: ask for a benchmark on the next launch */
 void melee_vita_bench_request(int num_players); /* 2 or 4 */

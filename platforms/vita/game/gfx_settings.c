@@ -51,21 +51,31 @@ extern int g_melee_vita_skip_stage_particles; // gx.c, read by psdisp.c
 static void copy_extras(GfxSettings* dst, const GfxSettings* src)
 {
     dst->show_fps = src->show_fps;
-    dst->heavy30 = src->heavy30;
     dst->unlock_all = src->unlock_all;
     dst->tournament = src->tournament;
-    dst->stage_lite = src->stage_lite;
 }
 int g_gfx_preset = GFX_PRESET_PERFORMANCE;
 
-static const char* preset_names[] = { "PERFORMANCE", "QUALITY", "CUSTOM" };
+static const char* preset_names[] = { "ULTRA PERFORMANCE", "PERFORMANCE", "QUALITY", "CUSTOM" };
 
 void gfx_settings_preset(GfxSettings* s, int preset)
 {
     memset(s, 0, sizeof(*s));
-    if (preset == GFX_PRESET_PERFORMANCE) {
+    s->heavy30 = 1; // 4 players at 30 in every preset
+    if (preset == GFX_PRESET_ULTRA) {
+        // Performance at 60%, no stage particles anywhere and Fountain of
+        // Dreams in potato mode, so every 1v1 runs at 60
+        s->stage_lite = (1 << GFX_STAGE_COUNT) - 1;
+        s->stage_potato = 1 << 4; // gfx_stages[4] = Fountain of Dreams
         s->menu_res = MELEE_VITA_RESOLUTION_60;
         s->game_res = MELEE_VITA_RESOLUTION_60;
+        s->boost = 1;
+        s->particles = 256;
+        s->live_screens = 8;
+        s->frame_rate = FRAME_RATE_60;
+    } else if (preset == GFX_PRESET_PERFORMANCE) {
+        s->menu_res = MELEE_VITA_RESOLUTION_75;
+        s->game_res = MELEE_VITA_RESOLUTION_75;
         s->boost = 1;
         s->particles = 256;
         s->live_screens = 8;
@@ -87,7 +97,7 @@ void gfx_settings_preset(GfxSettings* s, int preset)
     }
 }
 
-// which preset these values are (show_fps doesn't count), or CUSTOM
+// which preset these values are (the extras don't count), or CUSTOM
 int gfx_settings_match(const GfxSettings* s)
 {
     for (int p = 0; p < GFX_PRESET_CUSTOM; p++) {
@@ -159,7 +169,7 @@ static void clamp_settings(GfxSettings* s)
     if (s->particles < 16) s->particles = 16;
     if (s->particles > 4096) s->particles = 4096;
     if (s->live_screens < 1) s->live_screens = 1;
-    if (s->live_screens > 30) s->live_screens = 30;
+    if (s->live_screens > 32) s->live_screens = 32;
     s->boost = s->boost != 0;
     s->vsync = s->vsync != 0;
     s->show_fps = s->show_fps != 0;
@@ -167,6 +177,7 @@ static void clamp_settings(GfxSettings* s)
     s->unlock_all = s->unlock_all != 0;
     s->tournament = s->tournament != 0;
     s->stage_lite &= (1 << GFX_STAGE_COUNT) - 1;
+    s->stage_potato &= 1 << 4; // potato is Fountain of Dreams only (gfx_stages[4])
     if (s->frame_rate != FRAME_RATE_30) s->frame_rate = FRAME_RATE_60;
 }
 
@@ -178,7 +189,6 @@ void gfx_settings_load(void)
     GfxSettings* c = &g_gfx_custom;
 
     gfx_settings_preset(c, GFX_PRESET_CUSTOM);
-    c->heavy30 = 1;
     g_gfx_preset = GFX_PRESET_PERFORMANCE; // the default, also for files without a preset line
 
     f = fopen(GFX_PATH, "r");
@@ -195,7 +205,8 @@ void gfx_settings_load(void)
 
         if (!strcmp(name, "preset"))
             g_gfx_preset = !strcmp(str, "performance") ? GFX_PRESET_PERFORMANCE
-                         : !strcmp(str, "quality") ? GFX_PRESET_QUALITY : GFX_PRESET_CUSTOM;
+                         : !strcmp(str, "quality") ? GFX_PRESET_QUALITY
+                         : !strcmp(str, "ultra") ? GFX_PRESET_ULTRA : GFX_PRESET_CUSTOM;
         else if (!strcmp(name, "menu_resolution")) c->menu_res = percent_to_res(val);
         else if (!strcmp(name, "gameplay_resolution")) c->game_res = percent_to_res(val);
         else if (!strcmp(name, "cpu_boost")) c->boost = val;
@@ -213,8 +224,10 @@ void gfx_settings_load(void)
             int kind = (int) strtol(name + 5, NULL, 16);
             for (int i = 0; i < GFX_STAGE_COUNT; i++)
                 if (gfx_stages[i].kind == kind) {
-                    if (val) c->stage_lite |= 1 << i;
+                    if (val >= 1) c->stage_lite |= 1 << i;
                     else c->stage_lite &= ~(1 << i);
+                    if (val >= 2) c->stage_potato |= 1 << i;
+                    else c->stage_potato &= ~(1 << i);
                 }
         }
     }
@@ -236,10 +249,11 @@ bool gfx_settings_save(void)
     if (!f) return false;
     fprintf(f, "# Melee Vita graphics settings\n");
     fprintf(f, "# Change these from the Settings button on the LiveArea screen.\n");
-    fprintf(f, "# preset: performance, quality or custom. The values below are\n");
-    fprintf(f, "# the custom ones; the other two presets ignore them, apart from\n");
-    fprintf(f, "# lock_30_big_matches and show_fps, which apply to every preset.\n");
-    fprintf(f, "preset=%s\n", g_gfx_preset == GFX_PRESET_PERFORMANCE ? "performance"
+    fprintf(f, "# preset: ultra, performance, quality or custom. The values below are\n");
+    fprintf(f, "# the custom ones; the other presets ignore them, apart from show_fps,\n");
+    fprintf(f, "# unlock_everything and tournament_rules, which apply to every preset.\n");
+    fprintf(f, "preset=%s\n", g_gfx_preset == GFX_PRESET_ULTRA ? "ultra"
+                             : g_gfx_preset == GFX_PRESET_PERFORMANCE ? "performance"
                              : g_gfx_preset == GFX_PRESET_QUALITY ? "quality" : "custom");
     fprintf(f, "menu_resolution=%d\n", res_to_percent(c->menu_res));
     fprintf(f, "gameplay_resolution=%d\n", res_to_percent(c->game_res));
@@ -249,15 +263,15 @@ bool gfx_settings_save(void)
     fprintf(f, "vsync=%d\n", c->vsync);
     fprintf(f, "show_fps=%d\n", c->show_fps);
     fprintf(f, "frame_rate=%d\n", c->frame_rate == FRAME_RATE_30 ? 30 : 60);
-    fprintf(f, "# 30 fps for matches with 3-4 players or on Fountain of Dreams\n");
+    fprintf(f, "# 30 fps for 3-4 players, or Fountain of Dreams without cutbacks\n");
     fprintf(f, "lock_30_big_matches=%d\n", c->heavy30);
     fprintf(f, "unlock_everything=%d\n", c->unlock_all);
     fprintf(f, "# 4 stocks, 8 minutes, items off, team attack on, pause off, legal stages\n");
     fprintf(f, "tournament_rules=%d\n", c->tournament);
-    fprintf(f, "# stage cutbacks (1 = on): hide the stage's own background particles\n");
+    fprintf(f, "# stage cutbacks: 0 off, 1 lite (no stage particles), 2 potato\n");
     for (int i = 0; i < GFX_STAGE_COUNT; i++)
         fprintf(f, "lite_%02x=%d   # %s\n", (unsigned) gfx_stages[i].kind,
-                (c->stage_lite >> i) & 1, gfx_stages[i].name);
+                (c->stage_potato >> i) & 1 ? 2 : (c->stage_lite >> i) & 1, gfx_stages[i].name);
     ok = fclose(f) == 0;
     if (ok) {
         remove(GFX_PATH);
@@ -278,16 +292,59 @@ static void set_fps30(int on)
     g_melee_vita_min_ticks = on ? 2 : 1;
 }
 
+// Potato mode is Fountain of Dreams only. It draws just the parts you play
+// on (map gobj index): the main stage with its water (3) and the side
+// platforms (4). Everything else is scenery with no collision or logic: the
+// backdrop (0, 1), the platforms' reflections (2), the decorations (5-10)
+// and the star points (-1, grIzumi_801CCB18).
+static const struct { int kind; signed char keep[4]; } potato_parts[] = {
+    { 0x02, { 3, 4, -1 } }, // Fountain of Dreams
+};
+static int potato_kind; // stage of the current match if it's in potato mode
+// grizumi.c: 0 normal, 1 water reflects the stage only (lite), 2 stage only
+// and drawn once per match (potato)
+int g_melee_vita_potato_reflection;
+u32 g_melee_vita_match_count; // grizumi.c: new match -> draw the reflection again
+extern void melee_vita_gxm_match_gameplay_res(int option); // gxm_game.c
+
+int melee_vita_stage_part_hidden(int part)
+{
+    if (!potato_kind) return 0;
+    for (int i = 0; i < (int) (sizeof(potato_parts) / sizeof(potato_parts[0])); i++) {
+        if (potato_parts[i].kind != potato_kind) continue;
+        for (int k = 0; k < 4 && potato_parts[i].keep[k] >= 0; k++)
+            if (potato_parts[i].keep[k] == part) return 0;
+        return 1;
+    }
+    return 0;
+}
+
 // decided once when the match starts, so the frame rate never changes mid-match
 void melee_vita_match_begin(int players, int stage_kind)
 {
-    g_melee_vita_skip_stage_particles = 0;
-    for (int i = 0; i < GFX_STAGE_COUNT; i++)
-        if (gfx_stages[i].kind == stage_kind && (g_gfx.stage_lite >> i) & 1)
-            g_melee_vita_skip_stage_particles = 1;
+    const int fod = stage_kind == 0x02; // Fountain of Dreams
+    int lite = 0, potato = 0;
+    for (int i = 0; i < GFX_STAGE_COUNT; i++) {
+        if (gfx_stages[i].kind != stage_kind) continue;
+        lite |= (g_gfx.stage_lite >> i) & 1;
+        potato |= (g_gfx.stage_potato >> i) & 1;
+    }
+    potato = fod && potato; // potato is FoD only
+    lite = lite || potato;
+    g_melee_vita_skip_stage_particles = lite;
+    g_melee_vita_potato_reflection = fod && potato ? 2 : fod && lite ? 1 : 0;
+    g_melee_vita_match_count++;
+    potato_kind = potato ? stage_kind : 0;
+    if (potato) {
+        // GPU side: the stage averaged 18 ms of GPU time at 60%
+        melee_vita_gxm_match_gameplay_res(MELEE_VITA_RESOLUTION_50);
+        g_melee_vita_particle_limit = 128;
+    }
 
     if (!g_gfx.heavy30 || g_gfx.frame_rate == FRAME_RATE_30) return;
-    set_fps30(players >= 3 || stage_kind == 0x02 /* Fountain of Dreams */);
+    // Fountain of Dreams with lite or potato is light enough for 60 in 1v1
+    if (fod && lite && players <= 2) return;
+    set_fps30(players >= 3 || fod);
     melee_vita_log_info("[GFX] match: %d players, stage 0x%02x -> %s fps", players, stage_kind,
                         g_melee_vita_fps30_active ? "30" : "60");
 }
@@ -295,6 +352,12 @@ void melee_vita_match_begin(int players, int stage_kind)
 void melee_vita_match_end(void)
 {
     g_melee_vita_skip_stage_particles = 0;
+    g_melee_vita_potato_reflection = 0;
+    if (potato_kind) {
+        melee_vita_gxm_match_gameplay_res(-1);
+        g_melee_vita_particle_limit = (u32) g_gfx.particles;
+    }
+    potato_kind = 0;
     set_fps30(g_gfx.frame_rate == FRAME_RATE_30); // menus go back to the setting
 }
 

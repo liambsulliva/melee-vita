@@ -17,12 +17,13 @@ typedef struct GfxSettings {
     int live_screens; /* refresh copied screens every N frames */
     int vsync;
     int frame_rate;   /* FRAME_RATE_*, see below */
+    int heavy30;      /* 3+ players or Fountain of Dreams: lock that match to 30 */
+    int stage_lite;   /* per-stage cutbacks, bit i = gfx_stages[i] */
+    int stage_potato; /* per-stage potato mode (implies lite), same bits */
     /* not part of any preset: */
     int show_fps;
-    int heavy30;      /* 3+ players or Fountain of Dreams: lock that match to 30 */
     int unlock_all;   /* every character and stage, never saved to the card */
     int tournament;   /* competitive VS rules the first time VS opens each boot */
-    int stage_lite;   /* per-stage cutbacks, bit i = gfx_stages[i] */
 } GfxSettings;
 
 /* Legal stages that have a cutback switch (stage_lite bits). */
@@ -35,6 +36,7 @@ enum { FRAME_RATE_60, FRAME_RATE_30 };
 extern int g_melee_vita_fps30_active; /* what's running right now */
 
 enum {
+    GFX_PRESET_ULTRA,       /* 60 in every 1v1 at any cost: all cutbacks on */
     GFX_PRESET_PERFORMANCE,
     GFX_PRESET_QUALITY,
     GFX_PRESET_CUSTOM,
@@ -50,7 +52,7 @@ bool gfx_settings_save(void); /* saves g_gfx_preset + g_gfx_custom */
 /* fixed values for PERFORMANCE / QUALITY, starting values for CUSTOM */
 void gfx_settings_preset(GfxSettings* s, int preset);
 /* settings for a preset: fixed values, or `custom` for CUSTOM. The options
- * that aren't part of a preset (show_fps, heavy30) always come from `custom`. */
+ * that aren't part of a preset (show_fps etc) always come from `custom`. */
 void gfx_settings_resolve(GfxSettings* out, int preset, const GfxSettings* custom);
 int gfx_settings_match(const GfxSettings* s); /* preset with these values, or CUSTOM */
 void gfx_settings_changed(void);              /* g_gfx edited: update preset/custom */
@@ -60,9 +62,13 @@ const char* gfx_settings_preset_name(int preset);
 /* Push g_gfx into the game: clocks, particle limit, live screen rate. */
 void gfx_settings_apply(void);
 
+/* grdisplay.c: potato mode skips some decorative stage parts */
+int melee_vita_stage_part_hidden(int part);
+
 /* gmvs.c: a match (VS, sudden death, training) starts / ends. With heavy30
- * on and a 60 fps setting, 3+ players or Fountain of Dreams lock that match
- * to 30; the rate never changes mid-match. */
+ * on and a 60 fps setting, 3+ players lock that match to 30, and so does
+ * Fountain of Dreams unless it has cutbacks on and 1-2 players. The rate
+ * never changes mid-match. */
 void melee_vita_match_begin(int players, int stage_kind);
 void melee_vita_match_end(void);
 

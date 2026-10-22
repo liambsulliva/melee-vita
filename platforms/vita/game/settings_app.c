@@ -29,11 +29,11 @@ enum {
     ROW_PARTICLES,
     ROW_LIVE,
     ROW_VSYNC,
-    ROW_HEAVY30, // from here down: not part of a preset
-    ROW_UNLOCK,
+    ROW_HEAVY30,
+    ROW_STAGES,
+    ROW_UNLOCK, // from here down: not part of a preset
     ROW_TOURNEY,
     ROW_FPS,
-    ROW_STAGES,
     ROW_CONTROLS,
     ROW_BENCH,   // buttons
     ROW_RESET,
@@ -43,18 +43,18 @@ enum {
 };
 
 static const int particle_steps[] = { 128, 256, 512, 1024, 2048 };
-static const int live_steps[] = { 1, 2, 4, 8 };
+static const int live_steps[] = { 1, 2, 4, 8, 16 };
 #define COUNT(a) ((int) (sizeof(a) / sizeof((a)[0])))
 
 static const char* row_names[ROW_COUNT] = {
     "PRESET", "MENU RESOLUTION", "GAMEPLAY RESOLUTION", "FRAME RATE", "CPU/GPU BOOST",
-    "PARTICLES", "LIVE SCREENS", "V-SYNC", "30 FPS IN BIG MATCHES", "UNLOCK EVERYTHING",
-    "TOURNAMENT RULES", "SHOW FPS", "STAGE CUTBACKS", "CONTROLS", "RUN BENCHMARK", "RESET TO DEFAULT",
+    "PARTICLES", "LIVE SCREENS", "V-SYNC", "30 FPS IN BIG MATCHES", "STAGE CUTBACKS",
+    "UNLOCK EVERYTHING", "TOURNAMENT RULES", "SHOW FPS", "CONTROLS", "RUN BENCHMARK", "RESET TO DEFAULT",
     "SAVE AND START", "SAVE AND EXIT",
 };
 
 static const char* help_text[ROW_COUNT] = {
-    "Performance: 60 FPS (30 with 3-4 players). Quality: sharpest, 30 FPS. Edits make it Custom.",
+    "Ultra: 60 in every 1v1, all cutbacks. Performance: 60 in 1v1 but FoD. Quality: 30, sharpest.",
     "Render size for menus. Lower runs faster, higher looks sharper.",
     "Render size during matches. Lower runs faster, higher looks sharper.",
     "30 is locked and even. The game itself always runs at full speed.",
@@ -62,13 +62,13 @@ static const char* help_text[ROW_COUNT] = {
     "Most particles drawn at once. Lower helps in big explosions.",
     "How often screens inside stages update (Pokemon Stadium, etc).",
     "Wait for the display refresh before showing each frame.",
-    "Matches with 3-4 players or on Fountain of Dreams run at a locked, even 30 FPS.",
+    "3-4 players, or Fountain of Dreams without cutbacks: the match runs at a locked 30 FPS.",
+    "X: per-stage switches that hide decorative stage effects to save time.",
     "All characters and stages, while this is on. Your save is not changed.",
     "VS starts with 4 stocks, 8 min, items off, team attack on, pause off, legal stages.",
     "Shows FPS, worst frame time and clocks in the top left corner.",
-    "X: per-stage switches that hide decorative stage effects to save time.",
     "X: change which Vita button does what.",
-    "Left/Right: 1v1 or 4 players. X: save, play 5 stages (~6 min), write a report.",
+    "Left/Right: 1v1 or 4 players. X: save, play 6 stages (~7 min), write a report.",
     "Go back to the Performance preset (controls are not changed).",
     "Save, then start the game.",
     "Save, then close the game.",
@@ -180,7 +180,7 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
     case ROW_FPS: snprintf(out, size, "%s", on_off(s->show_fps)); break;
     case ROW_STAGES: {
         int n = 0;
-        for (int i = 0; i < GFX_STAGE_COUNT; i++) n += (s->stage_lite >> i) & 1;
+        for (int i = 0; i < GFX_STAGE_COUNT; i++) n += ((s->stage_lite | s->stage_potato) >> i) & 1;
         snprintf(out, size, "%d ON", n);
         break;
     }
@@ -256,7 +256,8 @@ void settings_app_run(void)
         if (page == PAGE_MAIN) {
             if (pressed & SCE_CTRL_UP) row = (row + ROW_COUNT - 1) % ROW_COUNT;
             if (pressed & SCE_CTRL_DOWN) row = (row + 1) % ROW_COUNT;
-            if ((pressed & SCE_CTRL_CROSS) && row < ROW_STAGES) dir = 1;
+            if ((pressed & SCE_CTRL_CROSS) && row < ROW_BENCH && row != ROW_STAGES && row != ROW_CONTROLS)
+                dir = 1;
             // left/right on the benchmark row picks 1v1 / 4 players, X runs it
             if (dir) change(&g_gfx, row, dir);
             if (pressed & SCE_CTRL_CROSS) {
@@ -264,10 +265,8 @@ void settings_app_run(void)
                 if (row == ROW_CONTROLS) { page = PAGE_CONTROLS; sub_row = 0; }
                 if (row == ROW_RESET) {
                     g_gfx.show_fps = 0;
-                    g_gfx.heavy30 = 1;
                     g_gfx.unlock_all = 0;
                     g_gfx.tournament = 0;
-                    g_gfx.stage_lite = 0;
                     gfx_settings_select(GFX_PRESET_PERFORMANCE);
                 }
                 if (row == ROW_START || row == ROW_EXIT || row == ROW_BENCH) action = row;
@@ -279,13 +278,21 @@ void settings_app_run(void)
             if (pressed & SCE_CTRL_UP) sub_row = (sub_row + rows - 1) % rows;
             if (pressed & SCE_CTRL_DOWN) sub_row = (sub_row + 1) % rows;
             if (sub_row < STAGES_BACK && (dir || (pressed & SCE_CTRL_CROSS))) {
-                g_gfx.stage_lite ^= 1 << sub_row;
-                gfx_settings_changed(); // not part of a preset, just stored
+                // OFF -> LITE (-> POTATO, Fountain of Dreams only)
+                int bit = 1 << sub_row;
+                int levels = gfx_stages[sub_row].kind == 0x02 ? 3 : 2;
+                int level = (g_gfx.stage_potato & bit) ? 2 : (g_gfx.stage_lite & bit) ? 1 : 0;
+                level = (level + (dir < 0 ? levels - 1 : 1)) % levels;
+                g_gfx.stage_lite = level >= 1 ? g_gfx.stage_lite | bit : g_gfx.stage_lite & ~bit;
+                g_gfx.stage_potato = level == 2 ? g_gfx.stage_potato | bit : g_gfx.stage_potato & ~bit;
+                gfx_settings_changed(); // off the preset's cutbacks makes it Custom
             }
             if ((pressed & SCE_CTRL_CIRCLE) || (sub_row == STAGES_BACK && (pressed & SCE_CTRL_CROSS)))
                 page = PAGE_MAIN;
             help = sub_row == STAGES_BACK ? "Back to the main settings."
-                 : "ON hides this stage's own particle effects. Fighter and item effects stay.";
+                 : gfx_stages[sub_row].kind == 0x02
+                     ? "LITE: 60 in 1v1, no stage particles, stage-only reflection. POTATO: also 50%, no scenery."
+                     : "LITE: hides this stage's own particle effects. Fighter and item effects stay.";
         } else {
             const int rows = CONTROLS_BACK + 1;
             if (pressed & SCE_CTRL_UP) sub_row = (sub_row + rows - 1) % rows;
@@ -318,7 +325,7 @@ void settings_app_run(void)
                 vita2d_pgf_draw_text(font, 60, 56, RGBA8(255, 210, 60, 255), 1.3f, "Settings");
                 for (int i = 0; i < ROW_COUNT; i++) {
                     int y = 90 + i * 21;
-                    if (i >= ROW_HEAVY30) y += 8; // gap before the options presets don't touch
+                    if (i >= ROW_UNLOCK) y += 8; // gap before the options presets don't touch
                     if (i >= ROW_BENCH) y += 8;   // and before the buttons
                     value_text(&g_gfx, i, val, sizeof(val));
                     if (i == ROW_STAGES || i == ROW_CONTROLS) {
@@ -335,7 +342,8 @@ void settings_app_run(void)
                     int y = 110 + i * 30 + (i == STAGES_BACK ? 16 : 0);
                     if (i < STAGES_BACK)
                         draw_row(font, y, i == sub_row, gfx_stages[i].name,
-                                 on_off((g_gfx.stage_lite >> i) & 1));
+                                 (g_gfx.stage_potato >> i) & 1 ? "POTATO"
+                                 : (g_gfx.stage_lite >> i) & 1 ? "LITE" : "OFF");
                     else
                         draw_row(font, y, i == sub_row, "BACK", "");
                 }
