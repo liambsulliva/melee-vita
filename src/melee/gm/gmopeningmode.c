@@ -447,7 +447,8 @@ void gm_SetupTitleDemo(void)
         static const s32 bench_fighters[4] = { CKind_Fox, CKind_Falco, CKind_Mars,
                                                CKind_Captain };
         for (i = 0; i < 4; i++) {
-            gm_801BF634(i, bench_fighters[i]);
+            // 1v1 runs leave slots 3 and 4 empty
+            gm_801BF634(i, i < melee_vita_bench_players() ? bench_fighters[i] : ChKind_None);
             gm_801BF65C(i, 0);
         }
         gm_801BF684(melee_vita_bench_stage());
@@ -560,6 +561,10 @@ void onEnterVs(GameModeState* arg0)
 #if defined(TARGET_VITA) && !defined(TARGET_PS5)
     if (melee_vita_bench_active()) {
         md->rules.on_match_start = bench_match_start;
+        for (i = melee_vita_bench_players(); i < 4; i++) {
+            md->players[i].ckind = ChKind_None;
+            md->players[i].slot_type = Gm_PKind_NA;
+        }
         md->rules.item_freq = -1; // items off
         *HSD_RandSeedPtr = melee_vita_bench_seed();
     }

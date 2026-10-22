@@ -446,7 +446,8 @@ $vpk = Join-Path $build 'SmashMeleevita.vpk'
 $link = @(
     '-fno-short-enums', '-Wl,-q', '-Wl,-z,nocopyreloc',
     '-Wl,--defsym=__sce_headroom=0x1000', '-Wl,--gc-sections',
-    '-Wl,--wrap=sceGxmBeginScene', '-Wl,--wrap=sceGxmCreateRenderTarget'
+    '-Wl,--wrap=sceGxmBeginScene', '-Wl,--wrap=sceGxmCreateRenderTarget',
+    '-Wl,--wrap=sceDisplayWaitVblankStart'
 ) + $platformObjects + @(
     '-Wl,--start-group', $gameArchive, '-Wl,--end-group'
 )

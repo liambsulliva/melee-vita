@@ -14,6 +14,7 @@ typedef struct GfxSettings {
     int live_screens; /* refresh copied screens every N frames */
     int vsync;
     int show_fps;
+    int fps30;        /* lock to 30 fps: logic still 60 Hz, draw every 2nd tick */
 } GfxSettings;
 
 enum {

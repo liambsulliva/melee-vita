@@ -13,6 +13,7 @@
 #include "../vita_log.h"
 
 #include <dolphin/gx/GXEnum.h>
+#include <psp2/display.h>
 #include <psp2/gxm.h>
 #include <vita2d.h>
 #include <psp2/kernel/processmgr.h>
@@ -109,6 +110,16 @@ static u32 s_render_width = MELEE_VITA_DISPLAY_WIDTH;
 static u32 s_render_height = MELEE_VITA_DISPLAY_HEIGHT;
 
 #define VITA_MAIN_SCENES_PER_FRAME 8u
+
+/* vita2d's display callback calls sceDisplayWaitVblankStart after each flip
+ * when its vblank wait is on. For the 30 fps lock it waits 2 vblanks so every
+ * frame stays up for exactly 2 refreshes. (vi.c calls the real one.) */
+int __real_sceDisplayWaitVblankStart(void);
+int __wrap_sceDisplayWaitVblankStart(void)
+{
+    if (g_gfx.fps30) return sceDisplayWaitVblankStartMulti(2);
+    return __real_sceDisplayWaitVblankStart();
+}
 
 int __real_sceGxmCreateRenderTarget(
     const SceGxmRenderTargetParams* params,
@@ -1060,7 +1071,7 @@ int melee_vita_gxm_init(void)
     if (s_initialized) return 0;
     result = vita2d_init_advanced(8u * 1024u * 1024u);
     if (result == 0) return -1;
-    vita2d_set_vblank_wait(g_gfx.vsync);
+    vita2d_set_vblank_wait(g_gfx.vsync || g_gfx.fps30);
     vita2d_set_clear_color(RGBA8(0, 0, 0, 255));
     // main() loaded graphics.txt already
     s_menu_resolution_option = g_gfx.menu_res;
@@ -1966,6 +1977,8 @@ static void exec_present_impl(const void* payload)
     }
 }
 
+static u32 s_drain_us; // last frame's wait for the GX submit worker
+
 void melee_vita_gxm_present(u32 clear_color)
 {
     extern int melee_vita_widescreen_active(void);
@@ -1980,7 +1993,11 @@ void melee_vita_gxm_present(u32 clear_color)
     if (!s_initialized) return;
     gfx_fps_tick();
     /* Every queued draw must be in this frame before it is handed over. */
-    gxs_drain();
+    {
+        const u64 drain_start = sceKernelGetProcessTimeWide();
+        gxs_drain();
+        s_drain_us = (u32) (sceKernelGetProcessTimeWide() - drain_start);
+    }
     recorded = &s_frames[s_record];
     p = melee_vita_rq_push_direct(exec_present, sizeof(RqPresent));
     if (p != NULL) {
@@ -2058,7 +2075,7 @@ void melee_vita_gxm_present(u32 clear_color)
         sceKernelWaitSema(s_rq_done, 1, NULL);
         waited = sceKernelGetProcessTimeWide() - t0;
         melee_vita_prof_add(VPZ_SWAP, waited);
-        melee_vita_bench_frame((u32) waited);
+        melee_vita_bench_frame((u32) waited, s_drain_us);
     }
     s_exec_frame = &s_frames[s_record];
     sceKernelSignalSema(s_rq_work, 1);

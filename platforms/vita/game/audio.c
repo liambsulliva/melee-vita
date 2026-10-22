@@ -489,6 +489,9 @@ void AXSetVoiceEndAddr(AXVPB* p, u32 value)
 void AXSetVoiceCurrentAddr(AXVPB* p, u32 value)
 { if (p) { ((VitaVoice*) p)->current_address = value; set_pair(&p->pb.addr.currentAddressHi, &p->pb.addr.currentAddressLo, value); } }
 
+// total time spent mixing audio on the game thread, for the benchmark
+u64 g_melee_vita_audio_mix_total_us;
+
 void melee_vita_audio_poll(void)
 {
     static s16 output[VITA_AUDIO_GRAIN * 2] __attribute__((aligned(64)));
@@ -521,7 +524,10 @@ void melee_vita_audio_poll(void)
         }
         {
             extern void melee_vita_prof_add(int zone, u64 us);
-            melee_vita_prof_add(10 /* audio_mix */, sceKernelGetProcessTimeWide() - mix_start);
+            const u64 mix_us = sceKernelGetProcessTimeWide() - mix_start;
+            extern u64 g_melee_vita_audio_mix_total_us;
+            melee_vita_prof_add(10 /* audio_mix */, mix_us);
+            g_melee_vita_audio_mix_total_us += mix_us;
         }
         if (s_audio_underruns != last_underruns && (s_audio_underruns % 50u) == 1u) {
             melee_vita_log_info("[AUDIO] underruns=%u", s_audio_underruns);

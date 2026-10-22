@@ -19,6 +19,7 @@ enum {
     ROW_PRESET,
     ROW_MENU_RES,
     ROW_GAME_RES,
+    ROW_FRAMERATE,
     ROW_BOOST,
     ROW_PARTICLES,
     ROW_LIVE,
@@ -39,12 +40,13 @@ static const char* help_text[ROW_COUNT] = {
     "Performance aims for a steady 60 FPS. Quality is the sharpest.",
     "Render size for menus. Lower runs faster, higher looks sharper.",
     "Render size during matches. Lower runs faster, higher looks sharper.",
+    "30 shows every other frame but evenly. The game itself still runs at 60.",
     "Runs the CPU at 444 MHz and the GPU at 222 MHz. Uses more battery.",
     "Most particles drawn at once. Lower helps in big explosions.",
     "How often screens inside stages update (Pokemon Stadium, etc).",
     "Wait for the display refresh before showing each frame.",
     "Shows FPS, worst frame time and clocks in the top left corner.",
-    "Save, then play 6 stages with CPUs (about 8 min) and write a report.",
+    "Left/Right: 1v1 or 4 players. X: save, play 5 stages (~6 min), write a report.",
     "Go back to the Default preset.",
     "Save, then start the game.",
     "Save, then close the game.",
@@ -70,6 +72,8 @@ static int step_list(const int* list, int n, int cur, int dir)
     if (i >= n) i = n - 1;
     return list[i];
 }
+
+static int bench_players = 2;
 
 static void change(GfxSettings* s, int row, int dir)
 {
@@ -97,6 +101,7 @@ static void change(GfxSettings* s, int row, int dir)
         if (s->game_res >= MELEE_VITA_RESOLUTION_OPTION_COUNT)
             s->game_res = MELEE_VITA_RESOLUTION_OPTION_COUNT - 1;
         break;
+    case ROW_FRAMERATE: s->fps30 = !s->fps30; break;
     case ROW_BOOST: s->boost = !s->boost; break;
     case ROW_PARTICLES:
         s->particles = step_list(particle_steps, COUNT(particle_steps), s->particles, dir);
@@ -107,6 +112,7 @@ static void change(GfxSettings* s, int row, int dir)
         break;
     case ROW_VSYNC: s->vsync = !s->vsync; break;
     case ROW_FPS: s->show_fps = !s->show_fps; break;
+    case ROW_BENCH: bench_players = bench_players == 4 ? 2 : 4; break;
     default: break;
     }
 }
@@ -127,7 +133,9 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
         snprintf(out, size, "%d%%  (%ux%u)", pct[r], (unsigned) w, (unsigned) h);
         break;
     }
+    case ROW_FRAMERATE: snprintf(out, size, "%s", s->fps30 ? "30 (LOCKED)" : "60"); break;
     case ROW_BOOST: snprintf(out, size, "%s", s->boost ? "ON" : "OFF"); break;
+    case ROW_BENCH: snprintf(out, size, "%s", bench_players == 4 ? "4 PLAYERS" : "1 VS 1"); break;
     case ROW_PARTICLES: snprintf(out, size, "%d", s->particles); break;
     case ROW_LIVE:
         if (s->live_screens == 1) snprintf(out, size, "EVERY FRAME");
@@ -140,7 +148,7 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
 }
 
 static const char* row_names[ROW_COUNT] = {
-    "PRESET", "MENU RESOLUTION", "GAMEPLAY RESOLUTION", "CPU/GPU BOOST",
+    "PRESET", "MENU RESOLUTION", "GAMEPLAY RESOLUTION", "FRAME RATE", "CPU/GPU BOOST",
     "PARTICLES", "LIVE SCREENS", "V-SYNC", "SHOW FPS", "RUN BENCHMARK",
     "RESET TO DEFAULT", "SAVE AND START", "SAVE AND EXIT",
 };
@@ -194,6 +202,7 @@ void settings_app_run(void)
         if (pressed & SCE_CTRL_LEFT) dir = -1;
         if (pressed & SCE_CTRL_RIGHT) dir = 1;
         if ((pressed & SCE_CTRL_CROSS) && row < ROW_BENCH) dir = 1;
+        // left/right on the benchmark row picks 1v1 / 4 players, X runs it
         if (dir) change(&s, row, dir);
 
         if (pressed & SCE_CTRL_CROSS) {
@@ -213,11 +222,11 @@ void settings_app_run(void)
             vita2d_pgf_draw_text(font, 60, 60, RGBA8(255, 210, 60, 255), 1.4f, "Graphics Settings");
             for (int i = 0; i < ROW_COUNT; i++) {
                 char val[48];
-                int y = 112 + i * 29;
+                int y = 108 + i * 27;
                 u32 col = i == row ? RGBA8(255, 210, 60, 255) : RGBA8(230, 230, 230, 255);
                 if (i >= ROW_BENCH) y += 12; // small gap before the buttons
                 if (i == row)
-                    vita2d_draw_rectangle(50, y - 22, 860, 28, RGBA8(60, 60, 90, 255));
+                    vita2d_draw_rectangle(50, y - 21, 860, 26, RGBA8(60, 60, 90, 255));
                 vita2d_pgf_draw_text(font, 70, y, col, 1.0f, row_names[i]);
                 value_text(&s, i, val, sizeof(val));
                 if (val[0]) {
@@ -245,7 +254,7 @@ void settings_app_run(void)
     if (font) vita2d_free_pgf(font);
     vita2d_fini();
 
-    if (action == ROW_BENCH) melee_vita_bench_request();
+    if (action == ROW_BENCH) melee_vita_bench_request(bench_players);
     if (action == ROW_START || action == ROW_BENCH) {
         // start fresh without the -settings param
         sceAppMgrLoadExec("app0:eboot.bin", NULL, NULL);

@@ -1379,6 +1379,9 @@ static u32 s_prof_vertices;
 
 static u64 s_prof_decode_us, s_prof_fill_us;
 static u32 s_prof_draws;
+/* Never reset, read by the benchmark: GPU display list draws, CPU-decoded
+ * draws, display list cache builds, rebuilds, CPU fallbacks. */
+u32 g_melee_vita_gx_counts[5];
 
 #ifndef MELEE_VITA_RELEASE
 void melee_vita_prof_get_geometry(u32* draws, u32* vertices)
@@ -1556,6 +1559,7 @@ static bool submit_gxr(GXPrimitive primitive,
         if (!draw_ready)
             s_prof_draw_us += GX_PROF_NOW() - draw_start;
         ++s_prof_draws;
+        ++g_melee_vita_gx_counts[1]; // drawn from CPU-decoded vertices
         return ok;
     }
 }
@@ -3233,6 +3237,7 @@ static bool draw_bump_display_list_gpu(
             draw, &key, &uniforms, e->vertices, e->indices,
             e->tri_count, cull);
         ++s_prof_draws;
+        ++g_melee_vita_gx_counts[0];
         {
             const u64 elapsed = GX_PROF_NOW() - started;
             s_prof_draw_us += elapsed;
@@ -3311,7 +3316,7 @@ static bool draw_display_list_gpu(
                 free(e);
                 --s_dl_stats.entries;
                 e = NULL;
-                ++s_dl_stats.rebuilds;
+                ++s_dl_stats.rebuilds; ++g_melee_vita_gx_counts[3];
             }
         }
         s_dl_stats.hash_us += GX_PROF_NOW() - t0;
@@ -3324,14 +3329,14 @@ static bool draw_display_list_gpu(
         s_prof_decode_us += GX_PROF_NOW() - t0;
         melee_vita_prof_add(VPZ_DL_BUILD, GX_PROF_NOW() - t0);
         if (e == NULL) {
-            ++s_dl_stats.fallbacks;
+            ++s_dl_stats.fallbacks; ++g_melee_vita_gx_counts[4];
             s_dl_fallback_reason = 5u;
             return false;
         }
         e->validated_frame = s_array_epoch;
         e->next = s_dl_cache[bucket];
         s_dl_cache[bucket] = e;
-        ++s_dl_stats.builds;
+        ++s_dl_stats.builds; ++g_melee_vita_gx_counts[2];
     } else {
         ++s_dl_stats.hits;
     }
@@ -3360,12 +3365,14 @@ static bool draw_display_list_gpu(
                 draw->line_width = 1.0f;
                 ok = gxr_draw_gpu(draw, &key, &uniforms, e->vertices, e->indices, e->tri_count, cull) && ok;
                 ++s_prof_draws;
+                ++g_melee_vita_gx_counts[0];
             }
             if (e->line_count) {
                 draw->primitive = GXR_PRIM_LINES;
                 draw->line_width = (s_gx.line_width / 6.0f) * (544.0f / 480.0f);
                 ok = gxr_draw_gpu(draw, &key, &uniforms, e->vertices, e->indices + e->tri_count, e->line_count, GXR_CULL_NONE) && ok;
                 ++s_prof_draws;
+                ++g_melee_vita_gx_counts[0];
             }
             if (e->point_count) {
                 const u32 chunks =
@@ -3394,6 +3401,7 @@ static bool draw_display_list_gpu(
                         if (point_ok) {
                             s_prof_vertices += count;
                             ++s_prof_draws;
+                            ++g_melee_vita_gx_counts[0];
                         }
                         ok = point_ok && ok;
                     }

@@ -29,12 +29,12 @@
  * keeps the old values */
 extern u32 g_melee_vita_particle_limit;
 extern u32 g_melee_vita_copy_interval;
+extern int g_melee_vita_min_ticks; // gmscene.c, logic ticks per drawn frame
 
 GfxSettings g_gfx;
 
 static const char* preset_names[] = { "PERFORMANCE", "DEFAULT", "QUALITY", "CUSTOM" };
 
-/* TODO: Quality should lock 30 fps once the frame cap is in */
 void gfx_settings_preset(GfxSettings* s, int preset)
 {
     int fps = s->show_fps; // not part of a preset
@@ -52,6 +52,7 @@ void gfx_settings_preset(GfxSettings* s, int preset)
         s->boost = 1;
         s->particles = 2048;
         s->live_screens = 1;
+        s->fps30 = 1;
     } else {
         // same as the release build before this menu existed
         s->menu_res = MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION;
@@ -112,6 +113,7 @@ static void clamp_settings(GfxSettings* s)
     s->boost = s->boost != 0;
     s->vsync = s->vsync != 0;
     s->show_fps = s->show_fps != 0;
+    s->fps30 = s->fps30 != 0;
 }
 
 // pull the two resolution values out of resolution-settings.bin
@@ -155,6 +157,7 @@ void gfx_settings_load(void)
         else if (!strcmp(name, "live_screens")) g_gfx.live_screens = val;
         else if (!strcmp(name, "vsync")) g_gfx.vsync = val;
         else if (!strcmp(name, "show_fps")) g_gfx.show_fps = val;
+        else if (!strcmp(name, "frame_rate")) g_gfx.fps30 = val > 0 && val <= 30;
     }
     fclose(f);
     clamp_settings(&g_gfx);
@@ -178,6 +181,7 @@ bool gfx_settings_save(void)
     fprintf(f, "live_screens=%d\n", g_gfx.live_screens);
     fprintf(f, "vsync=%d\n", g_gfx.vsync);
     fprintf(f, "show_fps=%d\n", g_gfx.show_fps);
+    fprintf(f, "frame_rate=%d\n", g_gfx.fps30 ? 30 : 60);
     ok = fclose(f) == 0;
     if (ok) {
         remove(GFX_PATH);
@@ -194,6 +198,7 @@ void gfx_settings_apply(void)
 {
     g_melee_vita_particle_limit = (u32) g_gfx.particles;
     g_melee_vita_copy_interval = (u32) g_gfx.live_screens;
+    g_melee_vita_min_ticks = g_gfx.fps30 ? 2 : 1;
 
     // off = leave whatever the system gave us
     if (g_gfx.boost) {

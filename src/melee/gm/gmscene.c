@@ -292,6 +292,9 @@ u64 g_melee_vita_update_us;
 u64 g_melee_vita_render_us;
 u32 g_melee_vita_update_ticks;
 u32 g_melee_vita_tick_total; // never reset, for the fps counter
+// 30 fps lock: wait for 2 logic ticks before drawing. The game still runs
+// at 60 Hz, it just draws every other tick.
+int g_melee_vita_min_ticks = 1;
 u64 g_melee_vita_update_total_us; // never reset, for the benchmark
 u64 g_melee_vita_render_total_us;
 static u64 g_melee_vita_update_start_us;
@@ -322,7 +325,11 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
         hsd_80392E80();
         gmMainLib_8046B0F0.xC = false;
 
+#ifdef TARGET_VITA
+        while ((pad_queue_count = lb_80019894()) < g_melee_vita_min_ticks) {
+#else
         while ((pad_queue_count = lb_80019894()) == 0) {
+#endif
             if (!traced_wait) {
                 OSReport("[FRAME] waiting for first controller/frame sample\n");
                 traced_wait = 1;

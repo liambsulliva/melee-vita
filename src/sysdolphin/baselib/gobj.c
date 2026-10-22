@@ -155,11 +155,33 @@ u32 HSD_GObj_80390EB8(s32 i)
 extern void melee_vita_render_poll(void);
 #endif
 
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+/* Benchmark profile: time each object's draw by class (fighter, stage...).
+ * Only while the benchmark records, about 1.5 us per object. Objects that
+ * draw other objects (texture cameras) are counted once, at the top. */
+extern int g_melee_vita_bench_prof;
+extern void melee_vita_bench_gobj(unsigned int classifier, u64 us);
+extern u64 sceKernelGetProcessTimeWide(void);
+static int s_prof_depth;
+#endif
+
 static inline void render_gobj(HSD_GObj* cur, int i)
 {
     HSD_GObj* saved = HSD_GObj_804D7814;
     HSD_GObj_804D7814 = cur;
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+    if (g_melee_vita_bench_prof && s_prof_depth == 0) {
+        u64 t0 = sceKernelGetProcessTimeWide();
+        s_prof_depth++;
+        cur->render_cb(cur, i);
+        s_prof_depth--;
+        melee_vita_bench_gobj(cur->classifier, sceKernelGetProcessTimeWide() - t0);
+    } else {
+        cur->render_cb(cur, i);
+    }
+#else
     cur->render_cb(cur, i);
+#endif
     HSD_GObj_804D7814 = saved;
 #ifdef TARGET_VITA
     /* On GameCube, DVD/ARAM completions and audio frames are interrupts and
