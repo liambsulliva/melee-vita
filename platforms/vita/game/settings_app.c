@@ -31,7 +31,8 @@ enum {
     ROW_VSYNC,
     ROW_HEAVY30,
     ROW_STAGES,
-    ROW_UNLOCK, // from here down: not part of a preset
+    ROW_ASPECT, // from here down: not part of a preset
+    ROW_UNLOCK,
     ROW_TOURNEY,
     ROW_FPS,
     ROW_CONTROLS,
@@ -49,7 +50,7 @@ static const int live_steps[] = { 1, 2, 4, 8, 16 };
 static const char* row_names[ROW_COUNT] = {
     "PRESET", "MENU RESOLUTION", "GAMEPLAY RESOLUTION", "FRAME RATE", "CPU/GPU BOOST",
     "PARTICLES", "LIVE SCREENS", "V-SYNC", "30 FPS IN BIG MATCHES", "STAGE CUTBACKS",
-    "UNLOCK EVERYTHING", "TOURNAMENT RULES", "SHOW FPS", "CONTROLS", "RUN BENCHMARK", "RESET TO DEFAULT",
+    "ASPECT RATIO", "UNLOCK EVERYTHING", "TOURNAMENT RULES", "SHOW FPS", "CONTROLS", "RUN BENCHMARK", "RESET TO DEFAULT",
     "SAVE AND START", "SAVE AND EXIT",
 };
 
@@ -64,6 +65,7 @@ static const char* help_text[ROW_COUNT] = {
     "Wait for the display refresh before showing each frame.",
     "3-4 players, or Fountain of Dreams without cutbacks: the match runs at a locked 30 FPS.",
     "X: per-stage switches that hide decorative stage effects to save time.",
+    "16:9 fills the screen in matches. 4:3 is the original picture, with black bars at the sides.",
     "All characters and stages, while this is on. Your save is not changed.",
     "VS starts with 4 stocks, 8 min, items off, team attack on, pause off, legal stages.",
     "Shows FPS, worst frame time and clocks in the top left corner.",
@@ -141,6 +143,7 @@ static void change(GfxSettings* s, int row, int dir)
         break;
     case ROW_VSYNC: s->vsync = !s->vsync; break;
     case ROW_HEAVY30: s->heavy30 = !s->heavy30; break;
+    case ROW_ASPECT: s->widescreen = !s->widescreen; break;
     case ROW_UNLOCK: s->unlock_all = !s->unlock_all; break;
     case ROW_TOURNEY: s->tournament = !s->tournament; break;
     case ROW_FPS: s->show_fps = !s->show_fps; break;
@@ -175,6 +178,7 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
         break;
     case ROW_VSYNC: snprintf(out, size, "%s", on_off(s->vsync)); break;
     case ROW_HEAVY30: snprintf(out, size, "%s", on_off(s->heavy30)); break;
+    case ROW_ASPECT: snprintf(out, size, "%s", s->widescreen ? "16:9 (WIDESCREEN)" : "4:3"); break;
     case ROW_UNLOCK: snprintf(out, size, "%s", on_off(s->unlock_all)); break;
     case ROW_TOURNEY: snprintf(out, size, "%s", on_off(s->tournament)); break;
     case ROW_FPS: snprintf(out, size, "%s", on_off(s->show_fps)); break;
@@ -264,6 +268,7 @@ void settings_app_run(void)
                 if (row == ROW_STAGES) { page = PAGE_STAGES; sub_row = 0; }
                 if (row == ROW_CONTROLS) { page = PAGE_CONTROLS; sub_row = 0; }
                 if (row == ROW_RESET) {
+                    g_gfx.widescreen = 1;
                     g_gfx.show_fps = 0;
                     g_gfx.unlock_all = 0;
                     g_gfx.tournament = 0;
@@ -324,8 +329,8 @@ void settings_app_run(void)
             if (page == PAGE_MAIN) {
                 vita2d_pgf_draw_text(font, 60, 56, RGBA8(255, 210, 60, 255), 1.3f, "Settings");
                 for (int i = 0; i < ROW_COUNT; i++) {
-                    int y = 90 + i * 21;
-                    if (i >= ROW_UNLOCK) y += 8; // gap before the options presets don't touch
+                    int y = 90 + i * 20;
+                    if (i >= ROW_ASPECT) y += 8; // gap before the options presets don't touch
                     if (i >= ROW_BENCH) y += 8;   // and before the buttons
                     value_text(&g_gfx, i, val, sizeof(val));
                     if (i == ROW_STAGES || i == ROW_CONTROLS) {

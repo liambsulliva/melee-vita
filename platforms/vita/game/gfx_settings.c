@@ -46,10 +46,12 @@ const struct GfxStage gfx_stages[GFX_STAGE_COUNT] = {
 extern int g_melee_vita_unlock_all;           // pc_stubs.c
 int g_melee_vita_tournament_rules;            // read by gmvsmelee.c
 extern int g_melee_vita_skip_stage_particles; // gx.c, read by psdisp.c
+extern void pc_widescreen_set_mode(int mode);   // widescreen.c: 0 = 4:3, 1 = 16:9
 
 // options that aren't part of any preset: copied across when presets change
 static void copy_extras(GfxSettings* dst, const GfxSettings* src)
 {
+    dst->widescreen = src->widescreen;
     dst->show_fps = src->show_fps;
     dst->unlock_all = src->unlock_all;
     dst->tournament = src->tournament;
@@ -172,6 +174,7 @@ static void clamp_settings(GfxSettings* s)
     if (s->live_screens > 32) s->live_screens = 32;
     s->boost = s->boost != 0;
     s->vsync = s->vsync != 0;
+    s->widescreen = s->widescreen != 0;
     s->show_fps = s->show_fps != 0;
     s->heavy30 = s->heavy30 != 0;
     s->unlock_all = s->unlock_all != 0;
@@ -189,6 +192,7 @@ void gfx_settings_load(void)
     GfxSettings* c = &g_gfx_custom;
 
     gfx_settings_preset(c, GFX_PRESET_CUSTOM);
+    c->widescreen = 1;
     g_gfx_preset = GFX_PRESET_PERFORMANCE; // the default, also for files without a preset line
 
     f = fopen(GFX_PATH, "r");
@@ -214,6 +218,7 @@ void gfx_settings_load(void)
         else if (!strcmp(name, "live_screens")) c->live_screens = val;
         else if (!strcmp(name, "vsync")) c->vsync = val;
         else if (!strcmp(name, "show_fps")) c->show_fps = val;
+        else if (!strcmp(name, "widescreen")) c->widescreen = val;
         else if (!strcmp(name, "frame_rate"))
             c->frame_rate = val > 0 && val <= 30 ? FRAME_RATE_30 : FRAME_RATE_60;
         else if (!strcmp(name, "lock_30_big_matches")) c->heavy30 = val;
@@ -250,8 +255,9 @@ bool gfx_settings_save(void)
     fprintf(f, "# Melee Vita graphics settings\n");
     fprintf(f, "# Change these from the Settings button on the LiveArea screen.\n");
     fprintf(f, "# preset: ultra, performance, quality or custom. The values below are\n");
-    fprintf(f, "# the custom ones; the other presets ignore them, apart from show_fps,\n");
-    fprintf(f, "# unlock_everything and tournament_rules, which apply to every preset.\n");
+    fprintf(f, "# the custom ones; the other presets ignore them, apart from widescreen,\n");
+    fprintf(f, "# show_fps, unlock_everything and tournament_rules, which apply to every\n");
+    fprintf(f, "# preset.\n");
     fprintf(f, "preset=%s\n", g_gfx_preset == GFX_PRESET_ULTRA ? "ultra"
                              : g_gfx_preset == GFX_PRESET_PERFORMANCE ? "performance"
                              : g_gfx_preset == GFX_PRESET_QUALITY ? "quality" : "custom");
@@ -261,6 +267,8 @@ bool gfx_settings_save(void)
     fprintf(f, "particles=%d\n", c->particles);
     fprintf(f, "live_screens=%d\n", c->live_screens);
     fprintf(f, "vsync=%d\n", c->vsync);
+    fprintf(f, "# 1 = 16:9 matches, 0 = 4:3 everywhere\n");
+    fprintf(f, "widescreen=%d\n", c->widescreen);
     fprintf(f, "show_fps=%d\n", c->show_fps);
     fprintf(f, "frame_rate=%d\n", c->frame_rate == FRAME_RATE_30 ? 30 : 60);
     fprintf(f, "# 30 fps for 3-4 players, or Fountain of Dreams without cutbacks\n");
@@ -367,6 +375,7 @@ void gfx_settings_apply(void)
     g_melee_vita_copy_interval = (u32) g_gfx.live_screens;
     g_melee_vita_unlock_all = g_gfx.unlock_all;
     g_melee_vita_tournament_rules = g_gfx.tournament;
+    pc_widescreen_set_mode(g_gfx.widescreen ? 1 : 0);
     set_fps30(g_gfx.frame_rate == FRAME_RATE_30);
 
     // off = leave whatever the system gave us

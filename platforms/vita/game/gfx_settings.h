@@ -21,6 +21,7 @@ typedef struct GfxSettings {
     int stage_lite;   /* per-stage cutbacks, bit i = gfx_stages[i] */
     int stage_potato; /* per-stage potato mode (implies lite), same bits */
     /* not part of any preset: */
+    int widescreen;   /* 1 = 16:9 matches, 0 = 4:3 everywhere (pillarboxed) */
     int show_fps;
     int unlock_all;   /* every character and stage, never saved to the card */
     int tournament;   /* competitive VS rules the first time VS opens each boot */
