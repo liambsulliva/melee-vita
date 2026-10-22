@@ -23,6 +23,9 @@ int melee_vita_bench_match_tick(u32 frame, int cancel);
 
 /* gxm_game.c: once per presented frame, after the render-thread sync */
 void melee_vita_bench_frame(u32 sync_wait_us, u32 drain_us);
+/* display callback: a flip was queued at this vcount; target = refreshes
+ * each frame should stay up (1 at 60 fps, 2 at 30) */
+void melee_vita_bench_flip(u32 vcount, u32 target);
 /* render thread: banner while running, results once done */
 int melee_vita_bench_wants_overlay(void);
 void melee_vita_bench_draw(void);

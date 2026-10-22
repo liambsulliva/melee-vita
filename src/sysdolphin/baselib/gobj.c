@@ -160,7 +160,8 @@ extern void melee_vita_render_poll(void);
  * Only while the benchmark records, about 1.5 us per object. Objects that
  * draw other objects (texture cameras) are counted once, at the top. */
 extern int g_melee_vita_bench_prof;
-extern void melee_vita_bench_gobj(unsigned int classifier, u64 us);
+extern u32 g_melee_vita_gx_counts[5];
+extern void melee_vita_bench_gobj(unsigned int classifier, u64 us, u32 draws);
 extern u64 sceKernelGetProcessTimeWide(void);
 static int s_prof_depth;
 #endif
@@ -171,11 +172,13 @@ static inline void render_gobj(HSD_GObj* cur, int i)
     HSD_GObj_804D7814 = cur;
 #if defined(TARGET_VITA) && !defined(TARGET_PS5)
     if (g_melee_vita_bench_prof && s_prof_depth == 0) {
+        u32 d0 = g_melee_vita_gx_counts[0] + g_melee_vita_gx_counts[1];
         u64 t0 = sceKernelGetProcessTimeWide();
         s_prof_depth++;
         cur->render_cb(cur, i);
         s_prof_depth--;
-        melee_vita_bench_gobj(cur->classifier, sceKernelGetProcessTimeWide() - t0);
+        melee_vita_bench_gobj(cur->classifier, sceKernelGetProcessTimeWide() - t0,
+                              g_melee_vita_gx_counts[0] + g_melee_vita_gx_counts[1] - d0);
     } else {
         cur->render_cb(cur, i);
     }

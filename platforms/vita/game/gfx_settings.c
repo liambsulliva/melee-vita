@@ -10,12 +10,11 @@
 #include <vita2d.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #define GFX_PATH "ux0:data/melee/graphics.txt"
 #define GFX_TMP_PATH "ux0:data/melee/graphics.tmp"
-/* old file from the in-game Vita Options panel, only read once to migrate */
-#define OLD_RES_PATH "ux0:data/melee/resolution-settings.bin"
 
 #ifndef MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION
 #define MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION MELEE_VITA_RESOLUTION_NATIVE
@@ -32,29 +31,30 @@ extern u32 g_melee_vita_copy_interval;
 extern int g_melee_vita_min_ticks; // gmscene.c, logic ticks per drawn frame
 
 GfxSettings g_gfx;
+GfxSettings g_gfx_custom;
+int g_gfx_preset = GFX_PRESET_PERFORMANCE;
 
-static const char* preset_names[] = { "PERFORMANCE", "DEFAULT", "QUALITY", "CUSTOM" };
+static const char* preset_names[] = { "PERFORMANCE", "QUALITY", "CUSTOM" };
 
 void gfx_settings_preset(GfxSettings* s, int preset)
 {
-    int fps = s->show_fps; // not part of a preset
     memset(s, 0, sizeof(*s));
-    s->show_fps = fps;
     if (preset == GFX_PRESET_PERFORMANCE) {
         s->menu_res = MELEE_VITA_RESOLUTION_60;
         s->game_res = MELEE_VITA_RESOLUTION_60;
         s->boost = 1;
         s->particles = 256;
         s->live_screens = 8;
+        s->frame_rate = FRAME_RATE_60;
     } else if (preset == GFX_PRESET_QUALITY) {
         s->menu_res = MELEE_VITA_RESOLUTION_NATIVE;
         s->game_res = MELEE_VITA_RESOLUTION_NATIVE;
         s->boost = 1;
         s->particles = 2048;
         s->live_screens = 1;
-        s->fps30 = 1;
+        s->frame_rate = FRAME_RATE_30;
     } else {
-        // same as the release build before this menu existed
+        // Custom starts out like the release build before this menu existed
         s->menu_res = MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION;
         s->game_res = MELEE_VITA_DEFAULT_GAMEPLAY_RESOLUTION_OPTION;
         s->boost = 0;
@@ -63,21 +63,51 @@ void gfx_settings_preset(GfxSettings* s, int preset)
     }
 }
 
-int gfx_settings_match_preset(const GfxSettings* s)
+// which preset these values are (show_fps doesn't count), or CUSTOM
+int gfx_settings_match(const GfxSettings* s)
 {
-    for (int i = 0; i < GFX_PRESET_COUNT; i++) {
-        GfxSettings p = *s;
-        gfx_settings_preset(&p, i);
-        p.vsync = s->vsync; // vsync and fps counter don't count
-        if (memcmp(&p, s, sizeof(p)) == 0)
-            return i;
+    for (int p = 0; p < GFX_PRESET_CUSTOM; p++) {
+        GfxSettings v;
+        gfx_settings_preset(&v, p);
+        v.show_fps = s->show_fps; // these two aren't part of a preset
+        v.heavy30 = s->heavy30;
+        if (memcmp(&v, s, sizeof(v)) == 0) return p;
     }
     return GFX_PRESET_CUSTOM;
 }
 
+// g_gfx was edited: a value that differs from the preset makes it Custom
+void gfx_settings_changed(void)
+{
+    g_gfx_preset = gfx_settings_match(&g_gfx);
+    if (g_gfx_preset == GFX_PRESET_CUSTOM) g_gfx_custom = g_gfx;
+    g_gfx_custom.show_fps = g_gfx.show_fps;
+    g_gfx_custom.heavy30 = g_gfx.heavy30;
+}
+
+// preset row: load that preset's values (Custom brings back the user's own)
+void gfx_settings_select(int preset)
+{
+    g_gfx_custom.show_fps = g_gfx.show_fps;
+    g_gfx_custom.heavy30 = g_gfx.heavy30;
+    gfx_settings_resolve(&g_gfx, preset, &g_gfx_custom);
+    g_gfx_preset = preset;
+}
+
+void gfx_settings_resolve(GfxSettings* out, int preset, const GfxSettings* custom)
+{
+    if (preset == GFX_PRESET_CUSTOM) {
+        *out = *custom;
+        return;
+    }
+    gfx_settings_preset(out, preset);
+    out->show_fps = custom->show_fps; // not part of a preset
+    out->heavy30 = custom->heavy30;
+}
+
 const char* gfx_settings_preset_name(int preset)
 {
-    if (preset < 0 || preset > GFX_PRESET_CUSTOM)
+    if (preset < 0 || preset >= GFX_PRESET_COUNT)
         preset = GFX_PRESET_CUSTOM;
     return preset_names[preset];
 }
@@ -113,21 +143,8 @@ static void clamp_settings(GfxSettings* s)
     s->boost = s->boost != 0;
     s->vsync = s->vsync != 0;
     s->show_fps = s->show_fps != 0;
-    s->fps30 = s->fps30 != 0;
-}
-
-// pull the two resolution values out of resolution-settings.bin
-static void migrate_old_file(void)
-{
-    struct { u32 magic, version; s32 menu, game; } old;
-    FILE* f = fopen(OLD_RES_PATH, "rb");
-    if (!f) return;
-    if (fread(&old, sizeof(old), 1, f) == 1 && old.magic == 0x31525356u && old.version == 1) {
-        g_gfx.menu_res = old.menu;
-        g_gfx.game_res = old.game;
-        melee_vita_log_info("[GFX] migrated resolution-settings.bin");
-    }
-    fclose(f);
+    s->heavy30 = s->heavy30 != 0;
+    if (s->frame_rate != FRAME_RATE_30) s->frame_rate = FRAME_RATE_60;
 }
 
 void gfx_settings_load(void)
@@ -135,36 +152,47 @@ void gfx_settings_load(void)
     char line[128];
     FILE* f;
 
-    gfx_settings_preset(&g_gfx, GFX_PRESET_DEFAULT);
-    g_gfx.show_fps = 0;
+    GfxSettings* c = &g_gfx_custom;
+
+    gfx_settings_preset(c, GFX_PRESET_CUSTOM);
+    c->heavy30 = 1;
+    g_gfx_preset = GFX_PRESET_PERFORMANCE; // the default, also for files without a preset line
 
     f = fopen(GFX_PATH, "r");
     if (!f) {
-        migrate_old_file();
-        clamp_settings(&g_gfx);
+        gfx_settings_resolve(&g_gfx, g_gfx_preset, c);
         return;
     }
     while (fgets(line, sizeof(line), f)) {
-        char name[32];
+        char name[32], str[32];
         int val;
         if (line[0] == '#') continue;
-        if (sscanf(line, " %31[^= ] = %d", name, &val) != 2) continue;
+        if (sscanf(line, " %31[^= ] = %31s", name, str) != 2) continue;
+        val = atoi(str);
 
-        if (!strcmp(name, "menu_resolution")) g_gfx.menu_res = percent_to_res(val);
-        else if (!strcmp(name, "gameplay_resolution")) g_gfx.game_res = percent_to_res(val);
-        else if (!strcmp(name, "cpu_boost")) g_gfx.boost = val;
-        else if (!strcmp(name, "particles")) g_gfx.particles = val;
-        else if (!strcmp(name, "live_screens")) g_gfx.live_screens = val;
-        else if (!strcmp(name, "vsync")) g_gfx.vsync = val;
-        else if (!strcmp(name, "show_fps")) g_gfx.show_fps = val;
-        else if (!strcmp(name, "frame_rate")) g_gfx.fps30 = val > 0 && val <= 30;
+        if (!strcmp(name, "preset"))
+            g_gfx_preset = !strcmp(str, "performance") ? GFX_PRESET_PERFORMANCE
+                         : !strcmp(str, "quality") ? GFX_PRESET_QUALITY : GFX_PRESET_CUSTOM;
+        else if (!strcmp(name, "menu_resolution")) c->menu_res = percent_to_res(val);
+        else if (!strcmp(name, "gameplay_resolution")) c->game_res = percent_to_res(val);
+        else if (!strcmp(name, "cpu_boost")) c->boost = val;
+        else if (!strcmp(name, "particles")) c->particles = val;
+        else if (!strcmp(name, "live_screens")) c->live_screens = val;
+        else if (!strcmp(name, "vsync")) c->vsync = val;
+        else if (!strcmp(name, "show_fps")) c->show_fps = val;
+        else if (!strcmp(name, "frame_rate"))
+            c->frame_rate = val > 0 && val <= 30 ? FRAME_RATE_30 : FRAME_RATE_60;
+        else if (!strcmp(name, "lock_30_big_matches")) c->heavy30 = val;
     }
     fclose(f);
-    clamp_settings(&g_gfx);
+    clamp_settings(c);
+    gfx_settings_resolve(&g_gfx, g_gfx_preset, c);
+    if (g_gfx_preset == GFX_PRESET_CUSTOM) g_gfx_preset = gfx_settings_match(&g_gfx);
 }
 
 bool gfx_settings_save(void)
 {
+    const GfxSettings* c = &g_gfx_custom;
     FILE* f;
     bool ok;
 
@@ -174,14 +202,21 @@ bool gfx_settings_save(void)
     if (!f) return false;
     fprintf(f, "# Melee Vita graphics settings\n");
     fprintf(f, "# Change these from the Settings button on the LiveArea screen.\n");
-    fprintf(f, "menu_resolution=%d\n", res_to_percent(g_gfx.menu_res));
-    fprintf(f, "gameplay_resolution=%d\n", res_to_percent(g_gfx.game_res));
-    fprintf(f, "cpu_boost=%d\n", g_gfx.boost);
-    fprintf(f, "particles=%d\n", g_gfx.particles);
-    fprintf(f, "live_screens=%d\n", g_gfx.live_screens);
-    fprintf(f, "vsync=%d\n", g_gfx.vsync);
-    fprintf(f, "show_fps=%d\n", g_gfx.show_fps);
-    fprintf(f, "frame_rate=%d\n", g_gfx.fps30 ? 30 : 60);
+    fprintf(f, "# preset: performance, quality or custom. The values below are\n");
+    fprintf(f, "# the custom ones; the other two presets ignore them, apart from\n");
+    fprintf(f, "# lock_30_big_matches and show_fps, which apply to every preset.\n");
+    fprintf(f, "preset=%s\n", g_gfx_preset == GFX_PRESET_PERFORMANCE ? "performance"
+                             : g_gfx_preset == GFX_PRESET_QUALITY ? "quality" : "custom");
+    fprintf(f, "menu_resolution=%d\n", res_to_percent(c->menu_res));
+    fprintf(f, "gameplay_resolution=%d\n", res_to_percent(c->game_res));
+    fprintf(f, "cpu_boost=%d\n", c->boost);
+    fprintf(f, "particles=%d\n", c->particles);
+    fprintf(f, "live_screens=%d\n", c->live_screens);
+    fprintf(f, "vsync=%d\n", c->vsync);
+    fprintf(f, "show_fps=%d\n", c->show_fps);
+    fprintf(f, "frame_rate=%d\n", c->frame_rate == FRAME_RATE_30 ? 30 : 60);
+    fprintf(f, "# 30 fps for matches with 3-4 players or on Fountain of Dreams\n");
+    fprintf(f, "lock_30_big_matches=%d\n", c->heavy30);
     ok = fclose(f) == 0;
     if (ok) {
         remove(GFX_PATH);
@@ -194,11 +229,33 @@ bool gfx_settings_save(void)
     return ok;
 }
 
+int g_melee_vita_fps30_active;
+
+static void set_fps30(int on)
+{
+    g_melee_vita_fps30_active = on;
+    g_melee_vita_min_ticks = on ? 2 : 1;
+}
+
+// decided once when the match starts, so the frame rate never changes mid-match
+void melee_vita_match_begin(int players, int stage_kind)
+{
+    if (!g_gfx.heavy30 || g_gfx.frame_rate == FRAME_RATE_30) return;
+    set_fps30(players >= 3 || stage_kind == 0x02 /* Fountain of Dreams */);
+    melee_vita_log_info("[GFX] match: %d players, stage 0x%02x -> %s fps", players, stage_kind,
+                        g_melee_vita_fps30_active ? "30" : "60");
+}
+
+void melee_vita_match_end(void)
+{
+    set_fps30(g_gfx.frame_rate == FRAME_RATE_30); // menus go back to the setting
+}
+
 void gfx_settings_apply(void)
 {
     g_melee_vita_particle_limit = (u32) g_gfx.particles;
     g_melee_vita_copy_interval = (u32) g_gfx.live_screens;
-    g_melee_vita_min_ticks = g_gfx.fps30 ? 2 : 1;
+    set_fps30(g_gfx.frame_rate == FRAME_RATE_30);
 
     // off = leave whatever the system gave us
     if (g_gfx.boost) {

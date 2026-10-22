@@ -47,6 +47,7 @@ typedef struct {
     u32 drain_us;  // waiting for the GX submit worker (part of render_us)
     u32 audio_us;  // audio mixing done on the game thread
     u32 cls_us[6]; // object drawing by class, see cls_names
+    u32 cls_draws[6]; // draw calls made by each class
     u32 counts[5]; // see count_names
 } Row;
 
@@ -74,8 +75,13 @@ typedef struct {
     float over17, over25, over34; // % of frames
     float game_speed;             // logic ticks per second, 60 = full speed
     float update_ms, render_ms, wait_ms;
-    float drain_ms, audio_ms, cls_ms[6], counts[5];
+    float drain_ms, audio_ms, cls_ms[6], cls_draws[6], counts[5];
     int hist[6];
+    // what the screen actually showed (from the display callback)
+    u32 shown[4];  // frames that stayed up 1, 2, 3, 4+ refreshes
+    u32 dropped;   // frames replaced before they were ever shown
+    float smooth;  // % of shown frames that stayed up exactly `target` refreshes
+    int target;    // 1 = 60 fps, 2 = 30 fps lock
 } Stats;
 
 static const char* hist_names[6] = { "<17.5", "17.5-20", "20-25", "25-34", "34-50", ">50" };
@@ -88,7 +94,9 @@ extern u32 g_melee_vita_gx_counts[5];       // gx.c
 
 // gobj.c times object draws by class while this is set
 int g_melee_vita_bench_prof;
-static u32 cur_cls_us[6];
+static u32 cur_cls_us[6], cur_cls_draws[6];
+// written by the display callback thread while recording
+static volatile u32 flip_shown[4], flip_dropped, flip_target, flip_last;
 static int players = 2;
 
 static int active;
@@ -133,7 +141,7 @@ static void compute_stats(const Row* r, int n, Stats* s)
 {
     static u32 sorted[MAX_ROWS];
     double total = 0, sq = 0, jit = 0, upd = 0, ren = 0, wai = 0, dra = 0, aud = 0;
-    double cls[6] = { 0 }, cnt[5] = { 0 };
+    double cls[6] = { 0 }, cls_d[6] = { 0 }, cnt[5] = { 0 };
     u32 ticks = 0;
     int o17 = 0, o25 = 0, o34 = 0;
 
@@ -153,6 +161,7 @@ static void compute_stats(const Row* r, int n, Stats* s)
         dra += r[i].drain_us;
         aud += r[i].audio_us;
         for (int c = 0; c < 6; c++) cls[c] += r[i].cls_us[c];
+        for (int c = 0; c < 6; c++) cls_d[c] += r[i].cls_draws[c];
         for (int c = 0; c < 5; c++) cnt[c] += r[i].counts[c];
         if (ms > 17.5) o17++;
         if (ms > 25.0) o25++;
@@ -187,6 +196,7 @@ static void compute_stats(const Row* r, int n, Stats* s)
     s->drain_ms = (float) (dra / n / 1000.0);
     s->audio_ms = (float) (aud / n / 1000.0);
     for (int c = 0; c < 6; c++) s->cls_ms[c] = (float) (cls[c] / n / 1000.0);
+    for (int c = 0; c < 6; c++) s->cls_draws[c] = (float) (cls_d[c] / n);
     for (int c = 0; c < 5; c++) s->counts[c] = (float) (cnt[c] / n);
 }
 
@@ -234,7 +244,7 @@ static void write_summary(void)
             cancelled ? " (cancelled)" : done ? "" : " (incomplete)");
     fprintf(f, "Settings: preset %s, menu %s, gameplay %s, boost %s, particles %d, "
                "live screens every %d, vsync %s\n",
-            gfx_settings_preset_name(gfx_settings_match_preset(&g_gfx)),
+            gfx_settings_preset_name(g_gfx_preset),
             g_gfx.menu_res == 0 ? "100%" : g_gfx.menu_res == 1 ? "75%" : g_gfx.menu_res == 2 ? "60%" : "50%",
             g_gfx.game_res == 0 ? "100%" : g_gfx.game_res == 1 ? "75%" : g_gfx.game_res == 2 ? "60%" : "50%",
             g_gfx.boost ? "on" : "off", g_gfx.particles, g_gfx.live_screens,
@@ -242,9 +252,9 @@ static void write_summary(void)
     fprintf(f, "Clocks: CPU %d MHz, bus %d MHz, GPU %d MHz, crossbar %d MHz\n",
             scePowerGetArmClockFrequency(), scePowerGetBusClockFrequency(),
             scePowerGetGpuClockFrequency(), scePowerGetGpuXbarClockFrequency());
-    fprintf(f, "Match: %s (all CPU level 9), items off. Frame rate %s.\n",
+    fprintf(f, "Match: %s (all CPU level 9), items off. Frame rate setting: %s.\n",
             players == 2 ? "Fox vs Falco" : "Fox, Falco, Marth, Captain Falcon",
-            g_gfx.fps30 ? "locked to 30" : "60");
+            g_gfx.frame_rate == FRAME_RATE_30 ? "30" : g_gfx.heavy30 ? "60, 30 in big matches" : "60");
     fprintf(f, "Each stage: %d s warm-up, then %d s of game time measured.\n\n",
             WARMUP_TICKS / 60, MEASURE_TICKS / 60);
 
@@ -274,6 +284,16 @@ static void write_summary(void)
         fprintf(f, "%-19s %8.2f %8.2f %8.2f\n", stages[i].name, results[i].update_ms,
                 results[i].render_ms, results[i].wait_ms);
 
+    fprintf(f, "\nScreen pacing (frames counted at the display flip)\n"
+               "%-19s %6s %8s %8s %8s %8s %8s %9s\n", "stage", "target", "1 vbl", "2 vbl",
+            "3 vbl", "4+ vbl", "dropped", "smooth");
+    for (int i = 0; i < nresults; i++) {
+        const Stats* s = &results[i];
+        fprintf(f, "%-19s %6s %8u %8u %8u %8u %8u %8.1f%%\n", stages[i].name,
+                s->target == 2 ? "30" : "60", (unsigned) s->shown[0], (unsigned) s->shown[1],
+                (unsigned) s->shown[2], (unsigned) s->shown[3], (unsigned) s->dropped, s->smooth);
+    }
+
     fprintf(f, "\nWhere the draw time goes (ms per frame)\n%-19s %8s %8s", "stage", "audio",
             "submit");
     for (int c = 0; c < 6; c++) fprintf(f, " %8s", cls_names[c]);
@@ -283,6 +303,18 @@ static void write_summary(void)
         for (int c = 0; c < 6; c++) fprintf(f, " %8.2f", results[i].cls_ms[c]);
         fprintf(f, "\n");
     }
+    fprintf(f, "\nDraw calls per frame by object kind (and us per draw call)\n%-19s", "stage");
+    for (int c = 0; c < 6; c++) fprintf(f, " %14s", cls_names[c]);
+    fprintf(f, "\n");
+    for (int i = 0; i < nresults; i++) {
+        fprintf(f, "%-19s", stages[i].name);
+        for (int c = 0; c < 6; c++) {
+            const float d = results[i].cls_draws[c];
+            fprintf(f, " %6.1f (%5.1f)", d, d > 0.5f ? 1000.0f * results[i].cls_ms[c] / d : 0.0f);
+        }
+        fprintf(f, "\n");
+    }
+
     fprintf(f, "\nGX work per frame\n%-19s", "stage");
     for (int c = 0; c < 5; c++) fprintf(f, " %16s", count_names[c]);
     fprintf(f, "\n");
@@ -300,6 +332,10 @@ static void write_summary(void)
                "- wait: time the game thread waited for the render thread (GPU side)\n"
                "  to finish the previous frame. High wait means GPU-bound, high logic\n"
                "  or draw means CPU-bound.\n"
+               "- screen pacing: how many refreshes (vbl, 16.7 ms each) every frame\n"
+               "  actually stayed on screen. smooth = %% of frames that stayed up\n"
+               "  exactly as long as they should (1 at 60 fps, 2 at 30). Dropped\n"
+               "  frames were replaced before they were shown (v-sync off).\n"
                "- audio: mixing sound on the game thread (inside draw).\n"
                "- submit: waiting for the GX submit worker thread at the end of\n"
                "  the frame (inside draw).\n"
@@ -362,9 +398,27 @@ int melee_vita_bench_players(void)
     return players;
 }
 
-void melee_vita_bench_gobj(unsigned int classifier, u64 us)
+void melee_vita_bench_flip(u32 vcount, u32 target)
+{
+    u32 held;
+    if (!recording) {
+        flip_last = 0;
+        return;
+    }
+    flip_target = target;
+    if (flip_last != 0) {
+        // the previous frame was on screen from its vblank until this one's
+        held = vcount - flip_last;
+        if (held == 0) flip_dropped++; // replaced in the same refresh, never shown
+        else flip_shown[held > 4 ? 3 : held - 1]++;
+    }
+    flip_last = vcount;
+}
+
+void melee_vita_bench_gobj(unsigned int classifier, u64 us, u32 draws)
 {
     cur_cls_us[cls_bucket(classifier)] += (u32) us;
+    cur_cls_draws[cls_bucket(classifier)] += draws;
 }
 
 u32 melee_vita_bench_seed(void)
@@ -376,7 +430,19 @@ u32 melee_vita_bench_seed(void)
 
 static void finish_stage(void)
 {
-    compute_stats(rows, nrows, &results[nresults]);
+    Stats* s = &results[nresults];
+    u32 total = 0;
+    compute_stats(rows, nrows, s);
+    for (int i = 0; i < 4; i++) {
+        s->shown[i] = flip_shown[i];
+        total += flip_shown[i];
+        flip_shown[i] = 0;
+    }
+    s->dropped = flip_dropped;
+    s->target = (int) flip_target;
+    s->smooth = total ? 100.0f * s->shown[s->target == 2 ? 1 : 0] / total : 0.0f;
+    flip_dropped = 0;
+    flip_last = 0;
     write_csv_rows();
     nresults++;
     melee_vita_log_info("[BENCH] %s: %.1f fps avg, %.1f 1%% low, %.1f ms worst",
@@ -443,6 +509,7 @@ void melee_vita_bench_frame(u32 sync_wait_us, u32 drain_us)
         r->drain_us = drain_us;
         r->audio_us = (u32) (aud - last_audio);
         memcpy(r->cls_us, cur_cls_us, sizeof(cur_cls_us));
+        memcpy(r->cls_draws, cur_cls_draws, sizeof(cur_cls_draws));
         for (int c = 0; c < 5; c++) r->counts[c] = g_melee_vita_gx_counts[c] - last_counts[c];
         r->render_us = 0;
         // the render total only goes up after present returns, so it
@@ -457,6 +524,7 @@ void melee_vita_bench_frame(u32 sync_wait_us, u32 drain_us)
     last_audio = aud;
     memcpy(last_counts, g_melee_vita_gx_counts, sizeof(last_counts));
     memset(cur_cls_us, 0, sizeof(cur_cls_us));
+    memset(cur_cls_draws, 0, sizeof(cur_cls_draws));
 }
 
 /* ---- overlay ---- */
@@ -476,11 +544,11 @@ static void draw_results(vita2d_pgf* font)
     // table 1: stage, avg, 1% low, worst, jitter, logic, draw, wait, speed
     static const int cols[] = { 40, 230, 315, 400, 490, 575, 660, 745, 840 };
     static const char* heads[] = { "stage", "avg fps", "1% low", "worst ms", "jitter",
-                                   "logic ms", "draw ms", "wait ms", "speed" };
+                                   "logic ms", "draw ms", "fps lock", "smooth" };
     // table 2: where the draw ms go
     static const int cols2[] = { 40, 230, 315, 400, 490, 575, 660, 745, 840 };
     static const char* heads2[] = { "draw ms ->", "audio", "submit", "fighters", "items",
-                                    "stage", "effects", "hud", "other" };
+                                    "stage", "effects", "hud", "draws" };
     char text[160];
     int y;
     u32 white = RGBA8(240, 240, 240, 255), grey = RGBA8(170, 170, 170, 255);
@@ -490,8 +558,9 @@ static void draw_results(vita2d_pgf* font)
     vita2d_pgf_draw_text(font, 40, 52, RGBA8(255, 210, 60, 255), 1.0f, text);
     // what was tested, so a photo of this screen is enough
     snprintf(text, sizeof(text), "%s  %s  %s fps   menu %s  gameplay %s   boost %s   particles %d   live %d   vsync %s   CPU %d GPU %d",
-             gfx_settings_preset_name(gfx_settings_match_preset(&g_gfx)),
-             players == 2 ? "1v1" : "4 players", g_gfx.fps30 ? "30" : "60",
+             gfx_settings_preset_name(g_gfx_preset),
+             players == 2 ? "1v1" : "4 players",
+             g_gfx.frame_rate == FRAME_RATE_30 ? "30" : g_gfx.heavy30 ? "60/30" : "60",
              res_name(g_gfx.menu_res), res_name(g_gfx.game_res), g_gfx.boost ? "on" : "off",
              g_gfx.particles, g_gfx.live_screens, g_gfx.vsync ? "on" : "off",
              scePowerGetArmClockFrequency(), scePowerGetGpuClockFrequency());
@@ -502,11 +571,11 @@ static void draw_results(vita2d_pgf* font)
     for (int i = 0; i < nresults; i++) {
         const Stats* s = &results[i];
         float v[8] = { s->avg_fps, s->low1_fps, s->worst_ms, s->jitter_ms,
-                       s->update_ms, s->render_ms, s->wait_ms, 100.0f * s->game_speed / 60.0f };
+                       s->update_ms, s->render_ms, s->target == 2 ? 30.0f : 60.0f, s->smooth };
         y += 25;
         vita2d_pgf_draw_text(font, cols[0], y, white, 0.8f, stages[i].name);
         for (int c = 0; c < 8; c++) {
-            snprintf(text, sizeof(text), c == 7 ? "%.0f%%" : "%.1f", v[c]);
+            snprintf(text, sizeof(text), c == 7 ? "%.0f%%" : c == 6 ? "%.0f" : "%.1f", v[c]);
             vita2d_pgf_draw_text(font, cols[c + 1], y, white, 0.8f, text);
         }
     }
@@ -521,13 +590,16 @@ static void draw_results(vita2d_pgf* font)
         vita2d_pgf_draw_text(font, cols2[1], y, white, 0.8f, text);
         snprintf(text, sizeof(text), "%.1f", s->drain_ms);
         vita2d_pgf_draw_text(font, cols2[2], y, white, 0.8f, text);
-        for (int c = 0; c < 6; c++) {
+        for (int c = 0; c < 5; c++) {
             snprintf(text, sizeof(text), "%.1f", s->cls_ms[c]);
             vita2d_pgf_draw_text(font, cols2[c + 3], y, white, 0.8f, text);
         }
+        // draw calls per frame (gpu + cpu)
+        snprintf(text, sizeof(text), "%.0f", s->counts[0] + s->counts[1]);
+        vita2d_pgf_draw_text(font, cols2[8], y, white, 0.8f, text);
     }
     vita2d_pgf_draw_text(font, 40, 455, grey, 0.7f,
-                         "audio = sound mixing on the game thread, submit = waiting for the GX submit worker");
+                         "smooth = frames that stayed on screen exactly as long as they should; audio = sound mixing on the game thread");
     snprintf(text, sizeof(text), "Full report: " BENCH_DIR "/bench-%03d.txt (and .csv)    Press any button to close",
              report_num);
     vita2d_pgf_draw_text(font, 40, 490, grey, 0.75f, text);

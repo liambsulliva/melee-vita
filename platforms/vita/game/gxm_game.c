@@ -111,14 +111,22 @@ static u32 s_render_height = MELEE_VITA_DISPLAY_HEIGHT;
 
 #define VITA_MAIN_SCENES_PER_FRAME 8u
 
-/* vita2d's display callback calls sceDisplayWaitVblankStart after each flip
- * when its vblank wait is on. For the 30 fps lock it waits 2 vblanks so every
- * frame stays up for exactly 2 refreshes. (vi.c calls the real one.) */
+/* vita2d's display callback calls sceDisplayWaitVblankStart right after
+ * queueing each flip (vblank wait is always on, see melee_vita_gxm_init).
+ * - 30 fps lock: wait 2 vblanks so every frame stays up for 2 refreshes
+ * - vsync on: wait 1
+ * - vsync off: don't wait, same as before
+ * It also tells the benchmark when each flip happened. (vi.c calls the real
+ * one directly.) */
 int __real_sceDisplayWaitVblankStart(void);
 int __wrap_sceDisplayWaitVblankStart(void)
 {
-    if (g_gfx.fps30) return sceDisplayWaitVblankStartMulti(2);
-    return __real_sceDisplayWaitVblankStart();
+    // the LiveArea settings screen draws with vita2d before the game starts
+    if (!s_initialized) return __real_sceDisplayWaitVblankStart();
+    melee_vita_bench_flip((u32) sceDisplayGetVcount(), g_melee_vita_fps30_active ? 2u : 1u);
+    if (g_melee_vita_fps30_active) return sceDisplayWaitVblankStartMulti(2);
+    if (g_gfx.vsync) return __real_sceDisplayWaitVblankStart();
+    return 0;
 }
 
 int __real_sceGxmCreateRenderTarget(
@@ -1022,6 +1030,7 @@ static void resolution_config_save(void)
 {
     g_gfx.menu_res = g_melee_vita_menu_resolution_option;
     g_gfx.game_res = g_melee_vita_gameplay_resolution_option;
+    gfx_settings_changed(); // off-preset values make it Custom
     if (!gfx_settings_save())
         melee_vita_log_info("[GXM] failed to persist resolution settings");
 }
@@ -1071,7 +1080,7 @@ int melee_vita_gxm_init(void)
     if (s_initialized) return 0;
     result = vita2d_init_advanced(8u * 1024u * 1024u);
     if (result == 0) return -1;
-    vita2d_set_vblank_wait(g_gfx.vsync || g_gfx.fps30);
+    vita2d_set_vblank_wait(1); // the wrapper above decides how long to wait
     vita2d_set_clear_color(RGBA8(0, 0, 0, 255));
     // main() loaded graphics.txt already
     s_menu_resolution_option = g_gfx.menu_res;
