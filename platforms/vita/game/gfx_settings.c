@@ -214,9 +214,24 @@ void gfx_settings_apply(void)
 
 extern u32 g_melee_vita_tick_total; // gmscene.c
 
-static vita2d_pgf* fps_font;
+static vita2d_pgf* font;
 // written by the game thread once a second, read by the render thread
 static volatile int fps_x10, game_x10, worst_ms_x10, arm_mhz, gpu_mhz;
+
+// shared by the fps counter and the benchmark overlay, render thread only
+vita2d_pgf* gfx_font(void)
+{
+    if (!font) {
+        char ascii[96];
+        font = vita2d_load_default_pgf();
+        if (!font) return NULL;
+        // put every glyph in the atlas now so it doesn't change mid-frame later
+        for (int i = 0; i < 95; i++) ascii[i] = (char) (32 + i);
+        ascii[95] = 0;
+        vita2d_pgf_text_width(font, 1.0f, ascii);
+    }
+    return font;
+}
 
 void gfx_fps_tick(void)
 {
@@ -253,19 +268,13 @@ void gfx_fps_draw(void)
     char text[96];
     int f, g, w;
 
-    if (!g_gfx.show_fps) return;
-    if (!fps_font) {
-        fps_font = vita2d_load_default_pgf();
-        if (!fps_font) return;
-        // put every glyph in the atlas now so it doesn't change mid-frame later
-        vita2d_pgf_text_width(fps_font, 1.0f, "0123456789. FPSgameworstmsCUGPMHz/");
-    }
+    if (!g_gfx.show_fps || !gfx_font()) return;
     f = fps_x10;
     g = game_x10;
     w = worst_ms_x10;
     snprintf(text, sizeof(text), "%d.%d FPS  game %d.%d/s  worst %d.%d ms  CPU %d GPU %d",
              f / 10, f % 10, g / 10, g % 10, w / 10, w % 10, arm_mhz, gpu_mhz);
-    vita2d_draw_rectangle(4.0f, 4.0f, (float) vita2d_pgf_text_width(fps_font, 0.8f, text) + 12.0f,
+    vita2d_draw_rectangle(4.0f, 4.0f, (float) vita2d_pgf_text_width(font, 0.8f, text) + 12.0f,
                           24.0f, RGBA8(0, 0, 0, 160));
-    vita2d_pgf_draw_text(fps_font, 10, 22, RGBA8(255, 255, 0, 255), 0.8f, text);
+    vita2d_pgf_draw_text(font, 10, 22, RGBA8(255, 255, 0, 255), 0.8f, text);
 }

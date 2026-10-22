@@ -39,6 +39,7 @@ void gfx_settings_apply(void);
  * draw() on the render thread inside a vita2d scene. */
 void gfx_fps_tick(void);
 void gfx_fps_draw(void);
+struct vita2d_pgf* gfx_font(void);
 
 /* LiveArea Settings screen (settings_app.c). run() never returns. */
 bool settings_app_requested(void);

@@ -4,6 +4,7 @@
  * of booting Melee. Same idea as mkwiita's Settings screen. */
 #include "gfx_settings.h"
 #include "gxm_resolution.h"
+#include "bench.h"
 
 #include <dolphin/types.h>
 #include <psp2/appmgr.h>
@@ -23,6 +24,7 @@ enum {
     ROW_LIVE,
     ROW_VSYNC,
     ROW_FPS,
+    ROW_BENCH,
     ROW_RESET,
     ROW_START,
     ROW_EXIT,
@@ -42,6 +44,7 @@ static const char* help_text[ROW_COUNT] = {
     "How often screens inside stages update (Pokemon Stadium, etc).",
     "Wait for the display refresh before showing each frame.",
     "Shows FPS, worst frame time and clocks in the top left corner.",
+    "Save, then play 6 stages with CPUs (about 8 min) and write a report.",
     "Go back to the Default preset.",
     "Save, then start the game.",
     "Save, then close the game.",
@@ -138,7 +141,7 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
 
 static const char* row_names[ROW_COUNT] = {
     "PRESET", "MENU RESOLUTION", "GAMEPLAY RESOLUTION", "CPU/GPU BOOST",
-    "PARTICLES", "LIVE SCREENS", "V-SYNC", "SHOW FPS",
+    "PARTICLES", "LIVE SCREENS", "V-SYNC", "SHOW FPS", "RUN BENCHMARK",
     "RESET TO DEFAULT", "SAVE AND START", "SAVE AND EXIT",
 };
 
@@ -152,7 +155,7 @@ void settings_app_run(void)
     u32 old_buttons = 0;
     int row = 0;
     int held = 0;
-    int action = -1; // ROW_START / ROW_EXIT / 0 for quit without saving
+    int action = -1; // ROW_START / ROW_EXIT / ROW_BENCH / 0 for quit without saving
 
     gfx_settings_load();
     s = g_gfx;
@@ -190,7 +193,7 @@ void settings_app_run(void)
         if (pressed & SCE_CTRL_DOWN) row = (row + 1) % ROW_COUNT;
         if (pressed & SCE_CTRL_LEFT) dir = -1;
         if (pressed & SCE_CTRL_RIGHT) dir = 1;
-        if ((pressed & SCE_CTRL_CROSS) && row < ROW_RESET) dir = 1;
+        if ((pressed & SCE_CTRL_CROSS) && row < ROW_BENCH) dir = 1;
         if (dir) change(&s, row, dir);
 
         if (pressed & SCE_CTRL_CROSS) {
@@ -199,7 +202,7 @@ void settings_app_run(void)
                 s.vsync = 0;
                 s.show_fps = 0;
             }
-            if (row == ROW_START || row == ROW_EXIT) action = row;
+            if (row == ROW_START || row == ROW_EXIT || row == ROW_BENCH) action = row;
         }
         if (pressed & SCE_CTRL_CIRCLE) action = 0;
 
@@ -210,11 +213,11 @@ void settings_app_run(void)
             vita2d_pgf_draw_text(font, 60, 60, RGBA8(255, 210, 60, 255), 1.4f, "Graphics Settings");
             for (int i = 0; i < ROW_COUNT; i++) {
                 char val[48];
-                int y = 115 + i * 31;
+                int y = 112 + i * 29;
                 u32 col = i == row ? RGBA8(255, 210, 60, 255) : RGBA8(230, 230, 230, 255);
-                if (i >= ROW_RESET) y += 12; // small gap before the buttons
+                if (i >= ROW_BENCH) y += 12; // small gap before the buttons
                 if (i == row)
-                    vita2d_draw_rectangle(50, y - 23, 860, 30, RGBA8(60, 60, 90, 255));
+                    vita2d_draw_rectangle(50, y - 22, 860, 28, RGBA8(60, 60, 90, 255));
                 vita2d_pgf_draw_text(font, 70, y, col, 1.0f, row_names[i]);
                 value_text(&s, i, val, sizeof(val));
                 if (val[0]) {
@@ -242,7 +245,8 @@ void settings_app_run(void)
     if (font) vita2d_free_pgf(font);
     vita2d_fini();
 
-    if (action == ROW_START) {
+    if (action == ROW_BENCH) melee_vita_bench_request();
+    if (action == ROW_START || action == ROW_BENCH) {
         // start fresh without the -settings param
         sceAppMgrLoadExec("app0:eboot.bin", NULL, NULL);
     }

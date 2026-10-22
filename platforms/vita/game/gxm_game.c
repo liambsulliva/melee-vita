@@ -2,6 +2,7 @@
 /* GXM-backed frame sink used by the original game's GX compatibility layer. */
 #include "gxm_game.h"
 #include "gfx_settings.h"
+#include "bench.h"
 #include "copy_texture_lifetime.h"
 #include "texture_swizzle.h"
 #include "heap.h"
@@ -1872,15 +1873,17 @@ typedef struct RqPresent {
     u16* indices;
 } RqPresent;
 
-// fps counter goes on top of the 960x544 scene, not the scaled one
+// fps counter and benchmark text go on top of the 960x544 scene, not the
+// scaled one
 static void draw_fps_overlay(void)
 {
-    if (!g_gfx.show_fps) return;
+    if (!g_gfx.show_fps && !melee_vita_bench_wants_overlay()) return;
     ++g_melee_vita_gxm_state_epoch;
     sceGxmSetCullMode(vita2d_get_context(), SCE_GXM_CULL_NONE);
     rt_default_depth();
     vita2d_set_blend_mode_add(0);
     gfx_fps_draw();
+    melee_vita_bench_draw();
 }
 
 static void exec_present_impl(const void* payload);
@@ -2051,8 +2054,11 @@ void melee_vita_gxm_present(u32 clear_color)
         /* Hand the recorded frame to the render thread once it has finished
          * the previous one; this wait is the only game/render sync point. */
         const u64 t0 = sceKernelGetProcessTimeWide();
+        u64 waited;
         sceKernelWaitSema(s_rq_done, 1, NULL);
-        melee_vita_prof_add(VPZ_SWAP, sceKernelGetProcessTimeWide() - t0);
+        waited = sceKernelGetProcessTimeWide() - t0;
+        melee_vita_prof_add(VPZ_SWAP, waited);
+        melee_vita_bench_frame((u32) waited);
     }
     s_exec_frame = &s_frames[s_record];
     sceKernelSignalSema(s_rq_work, 1);

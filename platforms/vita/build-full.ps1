@@ -297,6 +297,7 @@ $platformSources = @(
     'platforms/vita/texture_decoder.c',
     'platforms/vita/vita_log.c',
     'platforms/vita/game/audio.c',
+    'platforms/vita/game/bench.c',
     'platforms/vita/game/card.c',
     'platforms/vita/game/compat.c',
     'platforms/vita/game/dvd.c',
