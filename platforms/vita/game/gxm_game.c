@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 /* GXM-backed frame sink used by the original game's GX compatibility layer. */
 #include "gxm_game.h"
+#include "gfx_settings.h"
 #include "copy_texture_lifetime.h"
 #include "texture_swizzle.h"
 #include "heap.h"
@@ -1004,68 +1005,13 @@ u32 melee_vita_gxm_render_width(void) { return s_render_width; }
 u32 melee_vita_gxm_render_height(void) { return s_render_height; }
 
 #ifdef MELEE_VITA_RUNTIME_RESOLUTION_MENU
-#define VITA_RESOLUTION_CONFIG_PATH "ux0:data/melee/resolution-settings.bin"
-#define VITA_RESOLUTION_CONFIG_TEMP_PATH \
-    "ux0:data/melee/resolution-settings.tmp"
-#define VITA_RESOLUTION_CONFIG_MAGIC 0x31525356u
-#define VITA_RESOLUTION_CONFIG_VERSION 1u
-
-typedef struct MeleeVitaResolutionConfig {
-    u32 magic;
-    u32 version;
-    s32 menu_option;
-    s32 gameplay_option;
-} MeleeVitaResolutionConfig;
-
-static void resolution_config_load(void)
-{
-    MeleeVitaResolutionConfig config;
-    FILE* file = fopen(VITA_RESOLUTION_CONFIG_PATH, "rb");
-    bool valid;
-    if (file == NULL)
-        return;
-    valid = fread(&config, sizeof(config), 1u, file) == 1u &&
-            fgetc(file) == EOF &&
-            config.magic == VITA_RESOLUTION_CONFIG_MAGIC &&
-            config.version == VITA_RESOLUTION_CONFIG_VERSION &&
-            config.menu_option >= MELEE_VITA_RESOLUTION_NATIVE &&
-            config.menu_option < MELEE_VITA_RESOLUTION_OPTION_COUNT &&
-            config.gameplay_option >= MELEE_VITA_RESOLUTION_NATIVE &&
-            config.gameplay_option < MELEE_VITA_RESOLUTION_OPTION_COUNT;
-    fclose(file);
-    if (!valid) {
-        melee_vita_log_info(
-            "[GXM] ignored malformed resolution settings; using build defaults");
-        return;
-    }
-    g_melee_vita_menu_resolution_option = config.menu_option;
-    g_melee_vita_gameplay_resolution_option = config.gameplay_option;
-}
-
+// the in-game Vita Options panel saves into graphics.txt too now
 static void resolution_config_save(void)
 {
-    const MeleeVitaResolutionConfig config = {
-        VITA_RESOLUTION_CONFIG_MAGIC,
-        VITA_RESOLUTION_CONFIG_VERSION,
-        g_melee_vita_menu_resolution_option,
-        g_melee_vita_gameplay_resolution_option,
-    };
-    FILE* file = fopen(VITA_RESOLUTION_CONFIG_TEMP_PATH, "wb");
-    bool valid = file != NULL;
-    if (valid)
-        valid = fwrite(&config, sizeof(config), 1u, file) == 1u;
-    if (file != NULL && fclose(file) != 0)
-        valid = false;
-    if (valid) {
-        remove(VITA_RESOLUTION_CONFIG_PATH);
-        valid = rename(
-                    VITA_RESOLUTION_CONFIG_TEMP_PATH,
-                    VITA_RESOLUTION_CONFIG_PATH) == 0;
-    }
-    if (!valid) {
-        remove(VITA_RESOLUTION_CONFIG_TEMP_PATH);
+    g_gfx.menu_res = g_melee_vita_menu_resolution_option;
+    g_gfx.game_res = g_melee_vita_gameplay_resolution_option;
+    if (!gfx_settings_save())
         melee_vita_log_info("[GXM] failed to persist resolution settings");
-    }
 }
 
 bool melee_vita_gxm_apply_resolution_options(void)
@@ -1113,14 +1059,11 @@ int melee_vita_gxm_init(void)
     if (s_initialized) return 0;
     result = vita2d_init_advanced(8u * 1024u * 1024u);
     if (result == 0) return -1;
-    vita2d_set_vblank_wait(0);
+    vita2d_set_vblank_wait(g_gfx.vsync);
     vita2d_set_clear_color(RGBA8(0, 0, 0, 255));
-#ifdef MELEE_VITA_RUNTIME_RESOLUTION_MENU
-    resolution_config_load();
-    s_menu_resolution_option = g_melee_vita_menu_resolution_option;
-    s_gameplay_resolution_option =
-        g_melee_vita_gameplay_resolution_option;
-#endif
+    // main() loaded graphics.txt already
+    s_menu_resolution_option = g_gfx.menu_res;
+    s_gameplay_resolution_option = g_gfx.game_res;
     if (!resolution_target_create(s_menu_resolution_option))
         s_menu_resolution_option = MELEE_VITA_RESOLUTION_NATIVE;
     if (!resolution_target_create(s_gameplay_resolution_option))
@@ -1929,6 +1872,17 @@ typedef struct RqPresent {
     u16* indices;
 } RqPresent;
 
+// fps counter goes on top of the 960x544 scene, not the scaled one
+static void draw_fps_overlay(void)
+{
+    if (!g_gfx.show_fps) return;
+    ++g_melee_vita_gxm_state_epoch;
+    sceGxmSetCullMode(vita2d_get_context(), SCE_GXM_CULL_NONE);
+    rt_default_depth();
+    vita2d_set_blend_mode_add(0);
+    gfx_fps_draw();
+}
+
 static void exec_present_impl(const void* payload);
 static void exec_present(const void* payload)
 {
@@ -1949,6 +1903,8 @@ static void exec_present_impl(const void* payload)
         vita2d_draw_rectangle(0.0f, 0.0f, p->bar + 1.0f, 544.0f, RGBA8(0, 0, 0, 255));
         vita2d_draw_rectangle(960.0f - p->bar - 1.0f, 0.0f, p->bar + 1.0f, 544.0f, RGBA8(0, 0, 0, 255));
     }
+    if (!(s_rendering_internal && s_active_internal_target != NULL))
+        draw_fps_overlay();
     {
         const u64 end_start = sceKernelGetProcessTimeWide();
         vita2d_end_drawing();
@@ -1980,6 +1936,7 @@ static void exec_present_impl(const void* payload)
                 melee_vita_log_info(
                     "[GXM] internal EFB presentation draw unavailable");
         }
+        draw_fps_overlay();
         vita2d_end_drawing();
     }
 #ifdef MELEE_VITA_UPDATER
@@ -2018,6 +1975,7 @@ void melee_vita_gxm_present(u32 clear_color)
     RqPresent* p;
     u32 native_reasons;
     if (!s_initialized) return;
+    gfx_fps_tick();
     /* Every queued draw must be in this frame before it is handed over. */
     gxs_drain();
     recorded = &s_frames[s_record];

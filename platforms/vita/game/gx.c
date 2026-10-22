@@ -4109,6 +4109,10 @@ void GXCopyTex(void* destination, GXBool clear)
  * frame (the Cloaking Device's refraction grab): it must never be skipped by
  * the reduced refresh rate used for live screens. */
 int g_melee_vita_copy_every_frame;
+/* Graphics settings (gfx_settings.c) can change these at boot. PS5 keeps
+ * the defaults. */
+u32 g_melee_vita_copy_interval = MELEE_VITA_COPY_INTERVAL;
+u32 g_melee_vita_particle_limit = 512u;
 
 static void copy_tex_impl(void* destination, GXBool clear)
 {
@@ -4176,7 +4180,7 @@ static void copy_tex_impl(void* destination, GXBool clear)
         if (!clear && !target_created && !g_melee_vita_copy_every_frame &&
             i < 8u &&
             s_gx.copied_frames - recent[slot].frame <
-                MELEE_VITA_COPY_INTERVAL)
+                g_melee_vita_copy_interval)
             return;
         recent[slot].key = destination;
         recent[slot].frame = s_gx.copied_frames;

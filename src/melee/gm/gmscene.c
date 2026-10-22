@@ -291,6 +291,7 @@ extern u64 sceKernelGetProcessTimeWide(void);
 u64 g_melee_vita_update_us;
 u64 g_melee_vita_render_us;
 u32 g_melee_vita_update_ticks;
+u32 g_melee_vita_tick_total; // never reset, for the fps counter
 static u64 g_melee_vita_update_start_us;
 static u64 g_melee_vita_render_start_us;
 #endif
@@ -429,6 +430,7 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
             const u64 now_us = sceKernelGetProcessTimeWide();
             g_melee_vita_update_us += now_us - g_melee_vita_update_start_us;
             g_melee_vita_update_ticks += (u32) pad_queue_count;
+            g_melee_vita_tick_total += (u32) pad_queue_count;
             g_melee_vita_render_start_us = now_us;
             /* Live-profiler builds only: the symbol is absent otherwise. */
             if (melee_vita_profiler_record_duration != NULL) {
