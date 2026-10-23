@@ -24,6 +24,7 @@ typedef struct GfxSettings {
     int show_fps;
     int unlock_all;   /* every character and stage, never saved to the card */
     int tournament;   /* competitive VS rules the first time VS opens each boot */
+    int ucf;          /* UCF 0.84: easier dashbacks and shield drops */
 } GfxSettings;
 
 /* Legal stages that have a cutback switch (stage_lite bits). */

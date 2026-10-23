@@ -34,6 +34,7 @@ enum {
     ROW_ASPECT, // from here down: not part of a preset
     ROW_UNLOCK,
     ROW_TOURNEY,
+    ROW_UCF,
     ROW_FPS,
     ROW_CONTROLS,
     ROW_BENCH,   // buttons
@@ -50,8 +51,8 @@ static const int live_steps[] = { 1, 2, 4, 8, 16 };
 static const char* row_names[ROW_COUNT] = {
     "PRESET", "GAMEPLAY RESOLUTION", "FRAME RATE", "CPU/GPU BOOST",
     "PARTICLES", "LIVE SCREENS", "V-SYNC", "30 FPS IN BIG MATCHES", "STAGE CUTBACKS",
-    "ASPECT RATIO", "UNLOCK EVERYTHING", "TOURNAMENT RULES", "SHOW FPS", "CONTROLS", "RUN BENCHMARK", "RESET TO DEFAULT",
-    "SAVE AND START", "SAVE AND EXIT",
+    "ASPECT RATIO", "UNLOCK EVERYTHING", "TOURNAMENT RULES", "UCF (CONTROLLER FIX)", "SHOW FPS",
+    "CONTROLS", "RUN BENCHMARK", "RESET TO DEFAULT", "SAVE AND START", "SAVE AND EXIT",
 };
 
 static const char* help_text[ROW_COUNT] = {
@@ -67,6 +68,7 @@ static const char* help_text[ROW_COUNT] = {
     "16:9 fills the screen in matches. 4:3 is the original picture, with black bars at the sides.",
     "All characters and stages, while this is on. Your save is not changed.",
     "VS starts with 4 stocks, 8 min, items off, team attack on, pause off, legal stages.",
+    "UCF 0.84: dashbacks get a 2-frame window, shield drops stop turning into spot dodges.",
     "Shows FPS, worst frame time and clocks in the top left corner.",
     "X: change which Vita button does what.",
     "Left/Right: 1v1 or 4 players. X: save, play 6 stages (~7 min), write a report.",
@@ -319,6 +321,7 @@ static void change(GfxSettings* s, int row, int dir)
     case ROW_ASPECT: s->widescreen = !s->widescreen; break;
     case ROW_UNLOCK: s->unlock_all = !s->unlock_all; break;
     case ROW_TOURNEY: s->tournament = !s->tournament; break;
+    case ROW_UCF: s->ucf = !s->ucf; break;
     case ROW_FPS: s->show_fps = !s->show_fps; break;
     case ROW_BENCH: bench_players = bench_players == 4 ? 2 : 4; return;
     default: return;
@@ -353,6 +356,7 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
     case ROW_ASPECT: snprintf(out, size, "%s", s->widescreen ? "16:9 (WIDESCREEN)" : "4:3"); break;
     case ROW_UNLOCK: snprintf(out, size, "%s", on_off(s->unlock_all)); break;
     case ROW_TOURNEY: snprintf(out, size, "%s", on_off(s->tournament)); break;
+    case ROW_UCF: snprintf(out, size, "%s", on_off(s->ucf)); break;
     case ROW_FPS: snprintf(out, size, "%s", on_off(s->show_fps)); break;
     case ROW_STAGES: {
         int n = 0;
@@ -447,6 +451,7 @@ void settings_app_run(void)
                     g_gfx.show_fps = 0;
                     g_gfx.unlock_all = 0;
                     g_gfx.tournament = 0;
+                    g_gfx.ucf = 0;
                     gfx_settings_select(GFX_PRESET_PERFORMANCE);
                 }
                 if (row == ROW_START || row == ROW_EXIT || row == ROW_BENCH) action = row;

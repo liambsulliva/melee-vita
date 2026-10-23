@@ -41,6 +41,7 @@ const struct GfxStage gfx_stages[GFX_STAGE_COUNT] = {
 
 extern int g_melee_vita_unlock_all;           // pc_stubs.c
 int g_melee_vita_tournament_rules;            // read by gmvsmelee.c
+extern int g_melee_vita_ucf;                  // fighter.c
 extern int g_melee_vita_skip_stage_particles; // gx.c, read by psdisp.c
 extern void pc_widescreen_set_mode(int mode);   // widescreen.c: 0 = 4:3, 1 = 16:9
 
@@ -51,6 +52,7 @@ static void copy_extras(GfxSettings* dst, const GfxSettings* src)
     dst->show_fps = src->show_fps;
     dst->unlock_all = src->unlock_all;
     dst->tournament = src->tournament;
+    dst->ucf = src->ucf;
 }
 int g_gfx_preset = GFX_PRESET_PERFORMANCE;
 
@@ -171,6 +173,7 @@ static void clamp_settings(GfxSettings* s)
     s->heavy30 = s->heavy30 != 0;
     s->unlock_all = s->unlock_all != 0;
     s->tournament = s->tournament != 0;
+    s->ucf = s->ucf != 0;
     s->stage_lite &= (1 << GFX_STAGE_COUNT) - 1;
     s->stage_potato &= GFX_POTATO_STAGES;
     if (s->frame_rate != FRAME_RATE_30) s->frame_rate = FRAME_RATE_60;
@@ -215,6 +218,7 @@ void gfx_settings_load(void)
         else if (!strcmp(name, "lock_30_big_matches")) c->heavy30 = val;
         else if (!strcmp(name, "unlock_everything")) c->unlock_all = val;
         else if (!strcmp(name, "tournament_rules")) c->tournament = val;
+        else if (!strcmp(name, "ucf")) c->ucf = val;
         else if (!strncmp(name, "lite_", 5)) {
             // lite_<stage kind in hex>=1
             int kind = (int) strtol(name + 5, NULL, 16);
@@ -247,7 +251,7 @@ bool gfx_settings_save(void)
     fprintf(f, "# Change these from the Settings button on the LiveArea screen.\n");
     fprintf(f, "# preset: ultra, performance, quality or custom. The values below are\n");
     fprintf(f, "# the custom ones; the other presets ignore them, apart from widescreen,\n");
-    fprintf(f, "# show_fps, unlock_everything and tournament_rules, which apply to every\n");
+    fprintf(f, "# show_fps, unlock_everything, tournament_rules and ucf, which apply to every\n");
     fprintf(f, "# preset.\n");
     fprintf(f, "preset=%s\n", g_gfx_preset == GFX_PRESET_ULTRA ? "ultra"
                              : g_gfx_preset == GFX_PRESET_PERFORMANCE ? "performance"
@@ -266,6 +270,8 @@ bool gfx_settings_save(void)
     fprintf(f, "unlock_everything=%d\n", c->unlock_all);
     fprintf(f, "# 4 stocks, 8 minutes, items off, team attack on, pause off, legal stages\n");
     fprintf(f, "tournament_rules=%d\n", c->tournament);
+    fprintf(f, "# Universal Controller Fix 0.84: 2-frame dashback window, easier shield drops\n");
+    fprintf(f, "ucf=%d\n", c->ucf);
     fprintf(f, "# stage cutbacks: 0 off, 1 lite (no stage particles), 2 potato\n");
     for (int i = 0; i < GFX_STAGE_COUNT; i++)
         fprintf(f, "lite_%02x=%d   # %s\n", (unsigned) gfx_stages[i].kind,
@@ -374,6 +380,7 @@ void gfx_settings_apply(void)
     g_melee_vita_copy_interval = (u32) g_gfx.live_screens;
     g_melee_vita_unlock_all = g_gfx.unlock_all;
     g_melee_vita_tournament_rules = g_gfx.tournament;
+    g_melee_vita_ucf = g_gfx.ucf;
     pc_widescreen_set_mode(g_gfx.widescreen ? 1 : 0);
     set_fps30(g_gfx.frame_rate == FRAME_RATE_30);
 
