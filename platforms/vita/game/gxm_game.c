@@ -1053,7 +1053,6 @@ u32 melee_vita_gxm_render_height(void) { return s_render_height; }
 // the in-game Vita Options panel saves into graphics.txt too now
 static void resolution_config_save(void)
 {
-    g_gfx.menu_res = g_melee_vita_menu_resolution_option;
     g_gfx.game_res = g_melee_vita_gameplay_resolution_option;
     gfx_settings_changed(); // off-preset values make it Custom
     if (!gfx_settings_save())
@@ -1062,7 +1061,8 @@ static void resolution_config_save(void)
 
 bool melee_vita_gxm_apply_resolution_options(void)
 {
-    const int requested_menu = g_melee_vita_menu_resolution_option;
+    // menus always render at native res: they're cheap and the text stays sharp
+    const int requested_menu = MELEE_VITA_RESOLUTION_NATIVE;
     const int requested_gameplay =
         g_melee_vita_gameplay_resolution_option;
     u32 menu_width;
@@ -1090,6 +1090,7 @@ bool melee_vita_gxm_apply_resolution_options(void)
         return false;
     }
     s_menu_resolution_option = requested_menu;
+    g_melee_vita_menu_resolution_option = requested_menu;
     s_gameplay_resolution_option = requested_gameplay;
     resolution_config_save();
     melee_vita_log_info(
@@ -1122,7 +1123,7 @@ int melee_vita_gxm_init(void)
     vita2d_set_vblank_wait(1); // the wrapper above decides how long to wait
     vita2d_set_clear_color(RGBA8(0, 0, 0, 255));
     // main() loaded graphics.txt already
-    s_menu_resolution_option = g_gfx.menu_res;
+    s_menu_resolution_option = MELEE_VITA_RESOLUTION_NATIVE; // see apply_resolution_options()
     s_gameplay_resolution_option = g_gfx.game_res;
     if (!resolution_target_create(s_menu_resolution_option))
         s_menu_resolution_option = MELEE_VITA_RESOLUTION_NATIVE;

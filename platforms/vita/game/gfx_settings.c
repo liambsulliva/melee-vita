@@ -16,12 +16,8 @@
 #define GFX_PATH "ux0:data/melee/graphics.txt"
 #define GFX_TMP_PATH "ux0:data/melee/graphics.tmp"
 
-#ifndef MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION
-#define MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION MELEE_VITA_RESOLUTION_NATIVE
-#endif
 #ifndef MELEE_VITA_DEFAULT_GAMEPLAY_RESOLUTION_OPTION
-#define MELEE_VITA_DEFAULT_GAMEPLAY_RESOLUTION_OPTION \
-    MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION
+#define MELEE_VITA_DEFAULT_GAMEPLAY_RESOLUTION_OPTION MELEE_VITA_RESOLUTION_NATIVE
 #endif
 
 /* these live in gx.c so the PS5 build (which shares gx.c and psdisp.c)
@@ -65,25 +61,23 @@ void gfx_settings_preset(GfxSettings* s, int preset)
     memset(s, 0, sizeof(*s));
     s->heavy30 = 1; // 4 players at 30 in every preset
     if (preset == GFX_PRESET_ULTRA) {
-        // Performance at 60%, no stage particles anywhere and Fountain of
-        // Dreams in potato mode, so every 1v1 runs at 60
+        // Performance at 60% with half the particles, no stage particles
+        // anywhere and Fountain of Dreams in potato mode, so every 1v1 runs
+        // at 60
         s->stage_lite = (1 << GFX_STAGE_COUNT) - 1;
         s->stage_potato = 1 << 4; // gfx_stages[4] = Fountain of Dreams
-        s->menu_res = MELEE_VITA_RESOLUTION_60;
         s->game_res = MELEE_VITA_RESOLUTION_60;
         s->boost = 1;
-        s->particles = 256;
+        s->particles = 128;
         s->live_screens = 8;
         s->frame_rate = FRAME_RATE_60;
     } else if (preset == GFX_PRESET_PERFORMANCE) {
-        s->menu_res = MELEE_VITA_RESOLUTION_75;
         s->game_res = MELEE_VITA_RESOLUTION_75;
         s->boost = 1;
         s->particles = 256;
-        s->live_screens = 8;
+        s->live_screens = 4;
         s->frame_rate = FRAME_RATE_60;
     } else if (preset == GFX_PRESET_QUALITY) {
-        s->menu_res = MELEE_VITA_RESOLUTION_NATIVE;
         s->game_res = MELEE_VITA_RESOLUTION_NATIVE;
         s->boost = 1;
         s->particles = 2048;
@@ -91,7 +85,6 @@ void gfx_settings_preset(GfxSettings* s, int preset)
         s->frame_rate = FRAME_RATE_30;
     } else {
         // Custom starts out like the release build before this menu existed
-        s->menu_res = MELEE_VITA_DEFAULT_MENU_RESOLUTION_OPTION;
         s->game_res = MELEE_VITA_DEFAULT_GAMEPLAY_RESOLUTION_OPTION;
         s->boost = 0;
         s->particles = 512;
@@ -164,8 +157,6 @@ static int percent_to_res(int pct)
 
 static void clamp_settings(GfxSettings* s)
 {
-    if (s->menu_res < 0 || s->menu_res >= MELEE_VITA_RESOLUTION_OPTION_COUNT)
-        s->menu_res = MELEE_VITA_RESOLUTION_NATIVE;
     if (s->game_res < 0 || s->game_res >= MELEE_VITA_RESOLUTION_OPTION_COUNT)
         s->game_res = MELEE_VITA_RESOLUTION_NATIVE;
     if (s->particles < 16) s->particles = 16;
@@ -211,7 +202,6 @@ void gfx_settings_load(void)
             g_gfx_preset = !strcmp(str, "performance") ? GFX_PRESET_PERFORMANCE
                          : !strcmp(str, "quality") ? GFX_PRESET_QUALITY
                          : !strcmp(str, "ultra") ? GFX_PRESET_ULTRA : GFX_PRESET_CUSTOM;
-        else if (!strcmp(name, "menu_resolution")) c->menu_res = percent_to_res(val);
         else if (!strcmp(name, "gameplay_resolution")) c->game_res = percent_to_res(val);
         else if (!strcmp(name, "cpu_boost")) c->boost = val;
         else if (!strcmp(name, "particles")) c->particles = val;
@@ -261,7 +251,6 @@ bool gfx_settings_save(void)
     fprintf(f, "preset=%s\n", g_gfx_preset == GFX_PRESET_ULTRA ? "ultra"
                              : g_gfx_preset == GFX_PRESET_PERFORMANCE ? "performance"
                              : g_gfx_preset == GFX_PRESET_QUALITY ? "quality" : "custom");
-    fprintf(f, "menu_resolution=%d\n", res_to_percent(c->menu_res));
     fprintf(f, "gameplay_resolution=%d\n", res_to_percent(c->game_res));
     fprintf(f, "cpu_boost=%d\n", c->boost);
     fprintf(f, "particles=%d\n", c->particles);

@@ -262,10 +262,9 @@ static void write_summary(void)
 
     fprintf(f, "Melee Vita benchmark %03d%s\n\n", report_num,
             cancelled ? " (cancelled)" : done ? "" : " (incomplete)");
-    fprintf(f, "Settings: preset %s, menu %s, gameplay %s, boost %s, particles %d, "
+    fprintf(f, "Settings: preset %s, gameplay %s, boost %s, particles %d, "
                "live screens every %d, vsync %s\n",
             gfx_settings_preset_name(g_gfx_preset),
-            g_gfx.menu_res == 0 ? "100%" : g_gfx.menu_res == 1 ? "75%" : g_gfx.menu_res == 2 ? "60%" : "50%",
             g_gfx.game_res == 0 ? "100%" : g_gfx.game_res == 1 ? "75%" : g_gfx.game_res == 2 ? "60%" : "50%",
             g_gfx.boost ? "on" : "off", g_gfx.particles, g_gfx.live_screens,
             g_gfx.vsync ? "on" : "off");
@@ -619,11 +618,11 @@ static void draw_results(vita2d_pgf* font)
     snprintf(text, sizeof(text), "Benchmark %03d %s", report_num, cancelled ? "(cancelled)" : "done");
     vita2d_pgf_draw_text(font, 40, 52, RGBA8(255, 210, 60, 255), 1.0f, text);
     // what was tested, so a photo of this screen is enough
-    snprintf(text, sizeof(text), "%s  %s  %s fps   menu %s  gameplay %s   boost %s   particles %d   live %d   vsync %s   CPU %d GPU %d",
+    snprintf(text, sizeof(text), "%s  %s  %s fps   gameplay %s   boost %s   particles %d   live %d   vsync %s   CPU %d GPU %d",
              gfx_settings_preset_name(g_gfx_preset),
              players == 2 ? "1v1" : "4 players",
              g_gfx.frame_rate == FRAME_RATE_30 ? "30" : g_gfx.heavy30 ? "60/30" : "60",
-             res_name(g_gfx.menu_res), res_name(g_gfx.game_res), g_gfx.boost ? "on" : "off",
+             res_name(g_gfx.game_res), g_gfx.boost ? "on" : "off",
              g_gfx.particles, g_gfx.live_screens, g_gfx.vsync ? "on" : "off",
              scePowerGetArmClockFrequency(), scePowerGetGpuClockFrequency());
     vita2d_pgf_draw_text(font, 40, 76, grey, 0.7f, text);

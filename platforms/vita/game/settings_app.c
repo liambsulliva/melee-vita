@@ -22,7 +22,6 @@ enum { PAGE_MAIN, PAGE_STAGES, PAGE_CONTROLS };
 
 enum {
     ROW_PRESET,
-    ROW_MENU_RES,
     ROW_GAME_RES,
     ROW_FRAMERATE,
     ROW_BOOST,
@@ -48,7 +47,7 @@ static const int live_steps[] = { 1, 2, 4, 8, 16 };
 #define COUNT(a) ((int) (sizeof(a) / sizeof((a)[0])))
 
 static const char* row_names[ROW_COUNT] = {
-    "PRESET", "MENU RESOLUTION", "GAMEPLAY RESOLUTION", "FRAME RATE", "CPU/GPU BOOST",
+    "PRESET", "GAMEPLAY RESOLUTION", "FRAME RATE", "CPU/GPU BOOST",
     "PARTICLES", "LIVE SCREENS", "V-SYNC", "30 FPS IN BIG MATCHES", "STAGE CUTBACKS",
     "ASPECT RATIO", "UNLOCK EVERYTHING", "TOURNAMENT RULES", "SHOW FPS", "CONTROLS", "RUN BENCHMARK", "RESET TO DEFAULT",
     "SAVE AND START", "SAVE AND EXIT",
@@ -56,7 +55,6 @@ static const char* row_names[ROW_COUNT] = {
 
 static const char* help_text[ROW_COUNT] = {
     "Ultra: 60 in every 1v1, all cutbacks. Performance: 60 in 1v1 but FoD. Quality: 30, sharpest.",
-    "Render size for menus. Lower runs faster, higher looks sharper.",
     "Render size during matches. Lower runs faster, higher looks sharper.",
     "30 is locked and even. The game itself always runs at full speed.",
     "Runs the CPU at 444 MHz and the GPU at 222 MHz. Uses more battery.",
@@ -120,12 +118,6 @@ static void change(GfxSettings* s, int row, int dir)
         return;
     // resolution options go 0 = native .. 3 = 50%, so "right" means smaller
     // number = sharper
-    case ROW_MENU_RES:
-        s->menu_res -= dir;
-        if (s->menu_res < 0) s->menu_res = 0;
-        if (s->menu_res >= MELEE_VITA_RESOLUTION_OPTION_COUNT)
-            s->menu_res = MELEE_VITA_RESOLUTION_OPTION_COUNT - 1;
-        break;
     case ROW_GAME_RES:
         s->game_res -= dir;
         if (s->game_res < 0) s->game_res = 0;
@@ -161,9 +153,8 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
     out[0] = 0;
     switch (row) {
     case ROW_PRESET: snprintf(out, size, "%s", gfx_settings_preset_name(g_gfx_preset)); break;
-    case ROW_MENU_RES:
     case ROW_GAME_RES: {
-        int r = row == ROW_MENU_RES ? s->menu_res : s->game_res;
+        int r = s->game_res;
         static const int pct[] = { 100, 75, 60, 50 };
         melee_vita_resolution_option_dimensions(r, &w, &h);
         snprintf(out, size, "%d%%  (%ux%u)", pct[r], (unsigned) w, (unsigned) h);

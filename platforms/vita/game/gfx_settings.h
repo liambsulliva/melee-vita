@@ -10,8 +10,7 @@
  * away from them turns the preset into Custom; the Custom values are kept
  * so picking Custom again brings them back. */
 typedef struct GfxSettings {
-    int menu_res;     /* MELEE_VITA_RESOLUTION_* */
-    int game_res;
+    int game_res;     /* MELEE_VITA_RESOLUTION_*, menus are always native */
     int boost;        /* 444/222/222/166 MHz clocks */
     int particles;    /* max particles drawn per list */
     int live_screens; /* refresh copied screens every N frames */
