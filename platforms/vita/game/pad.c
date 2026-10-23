@@ -9,6 +9,7 @@
 #include <psp2/kernel/sysmem.h>
 #include <psp2/touch.h>
 
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -17,6 +18,8 @@
 #define VITA_PAD_CONFIG_MAGIC 0x31435056u
 #define VITA_PAD_CONFIG_VERSION 2u
 #define VITA_PAD_CONFIG_VERSION_LEGACY 1u
+#define VITA_STICK_CAL_PATH "ux0:data/melee/sticks.txt"
+#define VITA_STICK_CAL_TEMP_PATH "ux0:data/melee/sticks.tmp"
 
 typedef struct MeleeVitaPadConfig {
     u32 magic;
@@ -33,6 +36,7 @@ typedef struct MeleeVitaPadConfigV1 {
 static BOOL s_initialized;
 static bool s_is_pstv;
 static uint8_t s_mapping[MELEE_VITA_BUTTON_COUNT];
+static MeleeVitaStickCal s_stick_cal[MELEE_VITA_STICK_COUNT];
 static uint32_t s_raw_buttons;
 static uint32_t s_raw_buttons_triggered;
 static SceTouchPanelInfo s_touch_panel;
@@ -136,6 +140,129 @@ static void pad_config_save(void)
     }
 }
 
+/* Stick calibration. A stick that rests off centre or doesn't reach the
+ * edge gets moved back to centre and stretched to full range, then a
+ * radial deadzone zeroes out small drift. Melee itself clamps to a radius
+ * of 80, so anything past that is full tilt. */
+void melee_vita_pad_stick_cal_defaults(MeleeVitaStickCal* cal)
+{
+    cal->center_x = cal->center_y = 128;
+    cal->min_x = cal->min_y = 0;
+    cal->max_x = cal->max_y = 255;
+    cal->dead = 0;
+}
+
+static bool stick_cal_valid(const MeleeVitaStickCal* cal)
+{
+    return cal->min_x >= 0 && cal->min_x < cal->center_x && cal->center_x < cal->max_x &&
+           cal->max_x <= 255 && cal->min_y >= 0 && cal->min_y < cal->center_y &&
+           cal->center_y < cal->max_y && cal->max_y <= 255 && cal->dead >= 0 && cal->dead <= 50;
+}
+
+static void stick_cal_load(void)
+{
+    static const char* const names[MELEE_VITA_STICK_COUNT] = { "left", "right" };
+    char line[128];
+    FILE* file;
+    int i;
+
+    for (i = 0; i < MELEE_VITA_STICK_COUNT; ++i)
+        melee_vita_pad_stick_cal_defaults(&s_stick_cal[i]);
+    file = fopen(VITA_STICK_CAL_PATH, "r");
+    if (file == NULL)
+        return;
+    while (fgets(line, sizeof(line), file)) {
+        char name[16];
+        MeleeVitaStickCal cal;
+        if (sscanf(line, "%15[a-z]=%d %d %d %d %d %d %d", name, &cal.center_x, &cal.center_y,
+                   &cal.min_x, &cal.max_x, &cal.min_y, &cal.max_y, &cal.dead) != 8)
+            continue;
+        for (i = 0; i < MELEE_VITA_STICK_COUNT; ++i)
+            if (!strcmp(name, names[i]) && stick_cal_valid(&cal))
+                s_stick_cal[i] = cal;
+    }
+    fclose(file);
+}
+
+static bool stick_cal_save(void)
+{
+    static const char* const names[MELEE_VITA_STICK_COUNT] = { "left", "right" };
+    FILE* file = fopen(VITA_STICK_CAL_TEMP_PATH, "w");
+    bool valid = file != NULL;
+    int i;
+    if (valid) {
+        fprintf(file, "# stick calibration, raw 0-255: center_x center_y min_x max_x "
+                      "min_y max_y deadzone_percent\n");
+        for (i = 0; i < MELEE_VITA_STICK_COUNT; ++i) {
+            const MeleeVitaStickCal* c = &s_stick_cal[i];
+            fprintf(file, "%s=%d %d %d %d %d %d %d\n", names[i], c->center_x, c->center_y,
+                    c->min_x, c->max_x, c->min_y, c->max_y, c->dead);
+        }
+        valid = fclose(file) == 0;
+    }
+    if (valid) {
+        remove(VITA_STICK_CAL_PATH);
+        valid = rename(VITA_STICK_CAL_TEMP_PATH, VITA_STICK_CAL_PATH) == 0;
+    }
+    if (!valid) {
+        remove(VITA_STICK_CAL_TEMP_PATH);
+        melee_vita_log_info("[PAD] failed to persist stick calibration");
+    }
+    return valid;
+}
+
+void melee_vita_pad_get_stick_cal(int stick, MeleeVitaStickCal* cal)
+{
+    if (stick < 0 || stick >= MELEE_VITA_STICK_COUNT) {
+        melee_vita_pad_stick_cal_defaults(cal);
+        return;
+    }
+    *cal = s_stick_cal[stick];
+}
+
+bool melee_vita_pad_replace_stick_cal(const MeleeVitaStickCal cal[MELEE_VITA_STICK_COUNT])
+{
+    int i;
+    for (i = 0; i < MELEE_VITA_STICK_COUNT; ++i)
+        if (!stick_cal_valid(&cal[i]))
+            return false;
+    memcpy(s_stick_cal, cal, sizeof(s_stick_cal));
+    return stick_cal_save();
+}
+
+// one axis: offset from centre, stretched so the measured edge is 127
+static float stick_cal_axis(int value, int center, int lo, int hi)
+{
+    const int offset = value - center;
+    const int span = offset >= 0 ? hi - center : center - lo;
+    float out = (float) offset * 127.0f / (float) (span > 0 ? span : 127);
+    return out < -127.0f ? -127.0f : out > 127.0f ? 127.0f : out;
+}
+
+void melee_vita_pad_stick_apply(const MeleeVitaStickCal* cal, int raw_x, int raw_y,
+                                int8_t* x, int8_t* y)
+{
+    float fx = stick_cal_axis(raw_x, cal->center_x, cal->min_x, cal->max_x);
+    // Vita y grows downwards, GameCube y grows upwards
+    float fy = -stick_cal_axis(raw_y, cal->center_y, cal->min_y, cal->max_y);
+    const float r = sqrtf(fx * fx + fy * fy);
+    const float dead = (float) cal->dead * 127.0f / 100.0f;
+    if (r <= dead) {
+        *x = *y = 0;
+        return;
+    }
+    if (dead > 0.0f) {
+        // rescale so the edge of the deadzone starts at 0, not with a jump
+        const float k = (r - dead) / r * 127.0f / (127.0f - dead);
+        fx *= k;
+        fy *= k;
+    }
+    fx = fx < -127.0f ? -127.0f : fx > 127.0f ? 127.0f : fx;
+    fy = fy < -127.0f ? -127.0f : fy > 127.0f ? 127.0f : fy;
+    *x = (int8_t) lroundf(fx);
+    *y = (int8_t) lroundf(fy);
+}
+
 static s8 stick_axis(u8 value)
 {
     int converted = (int) value - 128;
@@ -200,17 +327,26 @@ BOOL PADInit(void)
             sceTouchGetPanelInfo(
                 SCE_TOUCH_PORT_FRONT, &s_touch_panel) >= 0;
         pad_config_load();
+        stick_cal_load();
         s_initialized = TRUE;
     }
     return TRUE;
 }
 
-/* GC status for one controller from a Vita/PS TV controller sample. */
-static void fill_status(PADStatus* status, const SceCtrlData* vita, const SceCtrlData* analog)
+/* GC status for one controller from a Vita/PS TV controller sample.
+ * cal: stick calibration for this controller, or NULL for raw sticks. */
+static void fill_status(PADStatus* status, const SceCtrlData* vita, const SceCtrlData* analog,
+                        const MeleeVitaStickCal* cal)
 {
     int i;
     status->err = PAD_ERR_NONE;
-    if (analog != NULL) {
+    if (cal != NULL) {
+        const SceCtrlData* src = analog != NULL ? analog : vita;
+        melee_vita_pad_stick_apply(&cal[MELEE_VITA_STICK_LEFT], src->lx, src->ly,
+                                   &status->stickX, &status->stickY);
+        melee_vita_pad_stick_apply(&cal[MELEE_VITA_STICK_RIGHT], src->rx, src->ry,
+                                   &status->substickX, &status->substickY);
+    } else if (analog != NULL) {
         status->stickX = stick_axis(analog->lx);
         status->stickY = stick_axis_inverted(analog->ly);
         status->substickX = stick_axis(analog->rx);
@@ -291,7 +427,7 @@ u32 PADRead(PADStatus* status)
 
     s_raw_buttons_triggered |= vita.buttons & ~s_raw_buttons;
     s_raw_buttons = vita.buttons;
-    fill_status(&status[0], &vita, s_is_pstv && analog_read > 0 ? &analog : NULL);
+    fill_status(&status[0], &vita, s_is_pstv && analog_read > 0 ? &analog : NULL, s_stick_cal);
 #ifdef TARGET_PS5
     /* Couch play: PS5 pads 2-4 (in login order) drive GC ports 2-4.  They
      * share the remapping; menus listen to the first pad's raw buttons. */
@@ -299,7 +435,7 @@ u32 PADRead(PADStatus* status)
         SceCtrlData extra;
         memset(&extra, 0, sizeof(extra));
         if (sceCtrlPeekBufferPositiveExt2(i + 1, &extra, 1) < 1) continue;
-        fill_status(&status[i], &extra, &extra);
+        fill_status(&status[i], &extra, &extra, NULL);
     }
 #endif
     return 0;
