@@ -55,7 +55,7 @@ static const char* row_names[ROW_COUNT] = {
 };
 
 static const char* help_text[ROW_COUNT] = {
-    "Ultra: 60 in every 1v1, all cutbacks. Performance: 60 in 1v1 but FoD. Quality: 30, sharpest.",
+    "Ultra: 60 in every 1v1, Lite + Potato. Performance: Lite, 60 in 1v1 but FoD. Quality: 30, sharpest.",
     "Render size during matches. Lower runs faster, higher looks sharper.",
     "30 is locked and even. The game itself always runs at full speed.",
     "Runs the CPU at 444 MHz and the GPU at 222 MHz. Uses more battery.",
@@ -458,9 +458,9 @@ void settings_app_run(void)
             if (pressed & SCE_CTRL_UP) sub_row = (sub_row + rows - 1) % rows;
             if (pressed & SCE_CTRL_DOWN) sub_row = (sub_row + 1) % rows;
             if (sub_row < STAGES_BACK && (dir || (pressed & SCE_CTRL_CROSS))) {
-                // OFF -> LITE (-> POTATO, Fountain of Dreams only)
+                // OFF -> LITE (-> POTATO, Fountain of Dreams and Yoshi's Story)
                 int bit = 1 << sub_row;
-                int levels = gfx_stages[sub_row].kind == 0x02 ? 3 : 2;
+                int levels = gfx_stages[sub_row].potato ? 3 : 2;
                 int level = (g_gfx.stage_potato & bit) ? 2 : (g_gfx.stage_lite & bit) ? 1 : 0;
                 level = (level + (dir < 0 ? levels - 1 : 1)) % levels;
                 g_gfx.stage_lite = level >= 1 ? g_gfx.stage_lite | bit : g_gfx.stage_lite & ~bit;
@@ -471,7 +471,9 @@ void settings_app_run(void)
                 page = PAGE_MAIN;
             help = sub_row == STAGES_BACK ? "Back to the main settings."
                  : gfx_stages[sub_row].kind == 0x02
-                     ? "LITE: 60 in 1v1, no stage particles, stage-only reflection. POTATO: also 50%, no scenery."
+                     ? "LITE: no stage particles, stage-only reflection, 60 in 1v1. POTATO: also 50%, no scenery."
+                 : gfx_stages[sub_row].kind == 0x08
+                     ? "LITE: no stage particles. POTATO: also no background or scenery behind the stage."
                      : "LITE: hides this stage's own particle effects. Fighter and item effects stay.";
         } else if (page == PAGE_STICKS) {
             help = sticks_input(&pad, pressed, dir, &sub_row, &page);

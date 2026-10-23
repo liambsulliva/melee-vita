@@ -31,12 +31,12 @@ GfxSettings g_gfx_custom;
 
 // StKind values (src/melee/gr/forward.h)
 const struct GfxStage gfx_stages[GFX_STAGE_COUNT] = {
-    { 0x1F, "Battlefield" },
-    { 0x20, "Final Destination" },
-    { 0x08, "Yoshi's Story" },
-    { 0x03, "Pokemon Stadium" },
-    { 0x02, "Fountain of Dreams" },
-    { 0x1C, "Dream Land N64" },
+    { 0x1F, "Battlefield", 0 },
+    { 0x20, "Final Destination", 0 },
+    { 0x08, "Yoshi's Story", 1 },
+    { 0x03, "Pokemon Stadium", 0 },
+    { 0x02, "Fountain of Dreams", 1 },
+    { 0x1C, "Dream Land N64", 0 },
 };
 
 extern int g_melee_vita_unlock_all;           // pc_stubs.c
@@ -62,16 +62,17 @@ void gfx_settings_preset(GfxSettings* s, int preset)
     s->heavy30 = 1; // 4 players at 30 in every preset
     if (preset == GFX_PRESET_ULTRA) {
         // Performance at 60% with half the particles, no stage particles
-        // anywhere and Fountain of Dreams in potato mode, so every 1v1 runs
-        // at 60
+        // anywhere and Fountain of Dreams and Yoshi's Story in potato mode,
+        // so every 1v1 runs at 60
         s->stage_lite = (1 << GFX_STAGE_COUNT) - 1;
-        s->stage_potato = 1 << 4; // gfx_stages[4] = Fountain of Dreams
+        s->stage_potato = GFX_POTATO_STAGES;
         s->game_res = MELEE_VITA_RESOLUTION_60;
         s->boost = 1;
         s->particles = 128;
         s->live_screens = 8;
         s->frame_rate = FRAME_RATE_60;
     } else if (preset == GFX_PRESET_PERFORMANCE) {
+        s->stage_lite = (1 << GFX_STAGE_COUNT) - 1; // no stage particles
         s->game_res = MELEE_VITA_RESOLUTION_75;
         s->boost = 1;
         s->particles = 256;
@@ -171,7 +172,7 @@ static void clamp_settings(GfxSettings* s)
     s->unlock_all = s->unlock_all != 0;
     s->tournament = s->tournament != 0;
     s->stage_lite &= (1 << GFX_STAGE_COUNT) - 1;
-    s->stage_potato &= 1 << 4; // potato is Fountain of Dreams only (gfx_stages[4])
+    s->stage_potato &= GFX_POTATO_STAGES;
     if (s->frame_rate != FRAME_RATE_30) s->frame_rate = FRAME_RATE_60;
 }
 
@@ -289,14 +290,22 @@ static void set_fps30(int on)
     g_melee_vita_min_ticks = on ? 2 : 1;
 }
 
-// Potato mode is Fountain of Dreams only. It draws just the parts you play
-// on (map gobj index): the main stage with its water (3) and the side
-// platforms (4). Everything else is scenery with no collision or logic: the
-// backdrop (0, 1), the platforms' reflections (2), the decorations (5-10)
-// and the star points (-1, grIzumi_801CCB18).
-static const struct { int kind; signed char keep[4]; } potato_parts[] = {
-    { 0x02, { 3, 4, -1 } }, // Fountain of Dreams
+// Potato mode draws just the stage parts you play on (map gobj index) and
+// caps particles at 128. Everything it hides is scenery with no collision
+// or logic.
+// Fountain of Dreams keeps the main stage with its water (3) and the side
+// platforms (4), and drops to 50%. Gone: the backdrop (0, 1), the
+// platforms' reflections (2), the decorations (5-10) and the star points
+// (-1, grIzumi_801CCB18).
+// Yoshi's Story keeps Randall (2) and the main stage (3, which also spawns
+// the Shy Guys; they're items and stay). Gone: the backdrop (0) and the
+// animated scenery behind the stage (1). It was CPU-bound (draw 15.0 +
+// logic 2.8 ms), so the resolution stays.
+static const struct { int kind; int res; signed char keep[4]; } potato_parts[] = {
+    { 0x02, MELEE_VITA_RESOLUTION_50, { 3, 4, -1 } }, // Fountain of Dreams
+    { 0x08, -1, { 2, 3, -1 } },                       // Yoshi's Story
 };
+#define POTATO_COUNT ((int) (sizeof(potato_parts) / sizeof(potato_parts[0])))
 static int potato_kind; // stage of the current match if it's in potato mode
 // grizumi.c: 0 normal, 1 water reflects the stage only (lite), 2 stage only
 // and drawn once per match (potato)
@@ -307,7 +316,7 @@ extern void melee_vita_gxm_match_gameplay_res(int option); // gxm_game.c
 int melee_vita_stage_part_hidden(int part)
 {
     if (!potato_kind) return 0;
-    for (int i = 0; i < (int) (sizeof(potato_parts) / sizeof(potato_parts[0])); i++) {
+    for (int i = 0; i < POTATO_COUNT; i++) {
         if (potato_parts[i].kind != potato_kind) continue;
         for (int k = 0; k < 4 && potato_parts[i].keep[k] >= 0; k++)
             if (potato_parts[i].keep[k] == part) return 0;
@@ -324,23 +333,24 @@ void melee_vita_match_begin(int players, int stage_kind)
     for (int i = 0; i < GFX_STAGE_COUNT; i++) {
         if (gfx_stages[i].kind != stage_kind) continue;
         lite |= (g_gfx.stage_lite >> i) & 1;
-        potato |= (g_gfx.stage_potato >> i) & 1;
+        potato |= (g_gfx.stage_potato >> i) & gfx_stages[i].potato;
     }
-    potato = fod && potato; // potato is FoD only
     lite = lite || potato;
     g_melee_vita_skip_stage_particles = lite;
     g_melee_vita_potato_reflection = fod && potato ? 2 : fod && lite ? 1 : 0;
     g_melee_vita_match_count++;
     potato_kind = potato ? stage_kind : 0;
     if (potato) {
-        // GPU side: the stage averaged 18 ms of GPU time at 60%
-        melee_vita_gxm_match_gameplay_res(MELEE_VITA_RESOLUTION_50);
+        for (int i = 0; i < POTATO_COUNT; i++)
+            if (potato_parts[i].kind == stage_kind && potato_parts[i].res >= 0)
+                melee_vita_gxm_match_gameplay_res(potato_parts[i].res);
         g_melee_vita_particle_limit = 128;
     }
 
     if (!g_gfx.heavy30 || g_gfx.frame_rate == FRAME_RATE_30) return;
-    // Fountain of Dreams with lite or potato is light enough for 60 in 1v1
-    if (fod && lite && players <= 2) return;
+    // Fountain of Dreams with lite or potato is light enough for 60 in 1v1,
+    // except at Performance's 75%: there it stays at 30
+    if (fod && lite && players <= 2 && g_gfx_preset != GFX_PRESET_PERFORMANCE) return;
     set_fps30(players >= 3 || fod);
     melee_vita_log_info("[GFX] match: %d players, stage 0x%02x -> %s fps", players, stage_kind,
                         g_melee_vita_fps30_active ? "30" : "60");

@@ -28,7 +28,8 @@ typedef struct GfxSettings {
 
 /* Legal stages that have a cutback switch (stage_lite bits). */
 #define GFX_STAGE_COUNT 6
-extern const struct GfxStage { int kind; const char* name; } gfx_stages[GFX_STAGE_COUNT];
+extern const struct GfxStage { int kind; const char* name; int potato; } gfx_stages[GFX_STAGE_COUNT];
+#define GFX_POTATO_STAGES ((1 << 2) | (1 << 4)) /* stages with .potato set */
 
 /* 30 fps lock: game logic still runs at 60 Hz, every 2nd tick is drawn and
  * each frame stays up for exactly 2 refreshes. */
@@ -36,7 +37,8 @@ enum { FRAME_RATE_60, FRAME_RATE_30 };
 extern int g_melee_vita_fps30_active; /* what's running right now */
 
 enum {
-    GFX_PRESET_ULTRA,       /* 60 in every 1v1 at any cost: all cutbacks on */
+    GFX_PRESET_ULTRA,       /* 60 in every 1v1 at any cost: all cutbacks on,
+                               potato on Fountain of Dreams and Yoshi's Story */
     GFX_PRESET_PERFORMANCE,
     GFX_PRESET_QUALITY,
     GFX_PRESET_CUSTOM,
