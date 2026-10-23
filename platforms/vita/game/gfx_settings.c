@@ -358,7 +358,11 @@ void melee_vita_match_begin(int players, int stage_kind)
         g_melee_vita_particle_limit = 128;
     }
 
-    if (!g_gfx.heavy30 || g_gfx.frame_rate == FRAME_RATE_30) return;
+    if (g_gfx.frame_rate == FRAME_RATE_30) {
+        set_fps30(1);
+        return;
+    }
+    if (!g_gfx.heavy30) return;
     // Fountain of Dreams with lite or potato is light enough for 60 in 1v1,
     // except at Performance's 75%: there it stays at 30
     if (fod && lite && players <= 2 && g_gfx_preset != GFX_PRESET_PERFORMANCE) return;
@@ -376,7 +380,7 @@ void melee_vita_match_end(void)
         g_melee_vita_particle_limit = (u32) g_gfx.particles;
     }
     potato_kind = 0;
-    set_fps30(g_gfx.frame_rate == FRAME_RATE_30); // menus go back to the setting
+    set_fps30(0); // menus always run at 60
 }
 
 void gfx_settings_apply(void)
@@ -387,7 +391,7 @@ void gfx_settings_apply(void)
     g_melee_vita_tournament_rules = g_gfx.tournament;
     g_melee_vita_ucf = g_gfx.ucf;
     pc_widescreen_set_mode(g_gfx.widescreen ? 1 : 0);
-    set_fps30(g_gfx.frame_rate == FRAME_RATE_30);
+    set_fps30(0); // menus run at 60, the frame rate setting is for matches
 
     // off = leave whatever the system gave us
     if (g_gfx.boost) {

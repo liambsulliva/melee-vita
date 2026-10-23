@@ -32,8 +32,9 @@ typedef struct GfxSettings {
 extern const struct GfxStage { int kind; const char* name; int potato; } gfx_stages[GFX_STAGE_COUNT];
 #define GFX_POTATO_STAGES ((1 << 2) | (1 << 4)) /* stages with .potato set */
 
-/* 30 fps lock: game logic still runs at 60 Hz, every 2nd tick is drawn and
- * each frame stays up for exactly 2 refreshes. */
+/* 30 fps lock, matches only (menus always run at 60): game logic still runs
+ * at 60 Hz, every 2nd tick is drawn and each frame stays up for exactly 2
+ * refreshes. */
 enum { FRAME_RATE_60, FRAME_RATE_30 };
 extern int g_melee_vita_fps30_active; /* what's running right now */
 

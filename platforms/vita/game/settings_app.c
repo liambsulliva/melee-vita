@@ -58,7 +58,7 @@ static const char* row_names[ROW_COUNT] = {
 static const char* help_text[ROW_COUNT] = {
     "Ultra: 60 in every 1v1, Lite + Potato. Performance: Lite, 60 in 1v1 but FoD. Quality: 30, sharpest.",
     "Render size during matches. Lower runs faster, higher looks sharper.",
-    "30 is locked and even. The game itself always runs at full speed.",
+    "For matches. 30 is locked and even, and the game itself still runs at full speed. Menus run at 60.",
     "Runs the CPU at 444 MHz and the GPU at 222 MHz. Uses more battery.",
     "Most particles drawn at once. Lower helps in big explosions.",
     "How often screens inside stages update (Pokemon Stadium, etc).",
