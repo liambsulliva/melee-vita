@@ -81,10 +81,13 @@ void gfx_settings_preset(GfxSettings* s, int preset)
         s->live_screens = 4;
         s->frame_rate = FRAME_RATE_60;
     } else if (preset == GFX_PRESET_QUALITY) {
+        // Fountain of Dreams on lite: with the fighters in its water it went
+        // over 33 ms. Live screens every 2nd frame for Pokemon Stadium 4P.
+        s->stage_lite = 1 << 4; // gfx_stages[4] = Fountain of Dreams
         s->game_res = MELEE_VITA_RESOLUTION_NATIVE;
         s->boost = 1;
         s->particles = 2048;
-        s->live_screens = 1;
+        s->live_screens = 2;
         s->frame_rate = FRAME_RATE_30;
     } else {
         // Custom starts out like the release build before this menu existed
@@ -341,6 +344,8 @@ void melee_vita_match_begin(int players, int stage_kind)
         lite |= (g_gfx.stage_lite >> i) & 1;
         potato |= (g_gfx.stage_potato >> i) & gfx_stages[i].potato;
     }
+    // presets: only potato holds 30 on Fountain of Dreams with 3-4 players
+    if (fod && players >= 3 && g_gfx_preset != GFX_PRESET_CUSTOM) potato = 1;
     lite = lite || potato;
     g_melee_vita_skip_stage_particles = lite;
     g_melee_vita_potato_reflection = fod && potato ? 2 : fod && lite ? 1 : 0;
