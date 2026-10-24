@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "vita_platform.h"
 #include "gfx_settings.h"
+#include "bench.h"
 #include "profiler_live.h"
 #include "../vita_log.h"
 #ifdef MELEE_VITA_UPDATER
@@ -35,6 +36,7 @@ int main(void)
 
     gfx_settings_load();
     gfx_settings_apply();
+    melee_vita_bench_init();
 
     result = melee_vita_platform_init();
     if (result < 0) {

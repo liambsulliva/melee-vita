@@ -29,6 +29,8 @@ param(
     [switch]$EnableScaledGxCopyFrames,
     [switch]$EnableRuntimeResolutionMenu,
     [switch]$EnableLiveProfiler,
+    # Settings screen gets a Run Benchmark row (game/bench.c)
+    [switch]$EnableBenchmark,
     [string]$ProfilerLibrary,
     [ValidatePattern('^[0-9]{1,3}(\.[0-9]{1,3}){3}$')]
     [string]$ProfilerHost = '10.1.1.146',
@@ -281,6 +283,7 @@ $gameArchive = & (Join-Path $PSScriptRoot 'build-game.ps1') `
     -EnableDirectSnag:$EnableDirectSnag `
     -EnableRenderTrace:$EnableRenderTrace `
     -EnableRuntimeResolutionMenu:$EnableRuntimeResolutionMenu `
+    -EnableBenchmark:$EnableBenchmark `
     -VitaReleaseVersion $version.release `
     -VitaBuildNumber $VitaBuildNumber |
     Select-Object -Last 1
@@ -321,6 +324,9 @@ $platformSources = @(
     'platforms/vita/game/vi.c',
     'platforms/vita/game/widescreen.c'
 )
+if ($EnableBenchmark) {
+    $platformSources += 'platforms/vita/game/bench.c'
+}
 if ($EnableUpdater) {
     $platformSources += @(
         'platforms/vita/updater/homebrew_update_client.c',
@@ -359,6 +365,9 @@ if ($Configuration -eq 'Debug') {
 }
 if ($EnableRenderTrace) {
     $common += '-DMELEE_VITA_RENDER_TRACE=1'
+}
+if ($EnableBenchmark) {
+    $common += '-DMELEE_VITA_BENCHMARK=1'
 }
 if ($EnableShaderCacheSeal) {
     $common += '-DMELEE_VITA_SHADER_CACHE_SEAL=1'

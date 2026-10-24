@@ -295,6 +295,8 @@ u32 g_melee_vita_tick_total; // never reset, for the fps counter
 // 30 fps lock: wait for 2 logic ticks before drawing. The game still runs
 // at 60 Hz, it just draws every other tick.
 int g_melee_vita_min_ticks = 1;
+u64 g_melee_vita_update_total_us; // never reset, for the benchmark
+u64 g_melee_vita_render_total_us;
 static u64 g_melee_vita_update_start_us;
 static u64 g_melee_vita_render_start_us;
 #endif
@@ -436,6 +438,7 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
             extern u64 sceKernelGetProcessTimeWide(void);
             const u64 now_us = sceKernelGetProcessTimeWide();
             g_melee_vita_update_us += now_us - g_melee_vita_update_start_us;
+            g_melee_vita_update_total_us += now_us - g_melee_vita_update_start_us;
             g_melee_vita_update_ticks += (u32) pad_queue_count;
             g_melee_vita_tick_total += (u32) pad_queue_count;
             g_melee_vita_render_start_us = now_us;
@@ -512,7 +515,9 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
 #ifdef TARGET_VITA
         {
             extern u64 sceKernelGetProcessTimeWide(void);
-            g_melee_vita_render_us += sceKernelGetProcessTimeWide() - g_melee_vita_render_start_us;
+            u64 render_dt = sceKernelGetProcessTimeWide() - g_melee_vita_render_start_us;
+            g_melee_vita_render_us += render_dt;
+            g_melee_vita_render_total_us += render_dt;
         }
 #endif
         if (!traced_render) {

@@ -5,6 +5,7 @@
  * Four pages: the main list, stage cutbacks, controls and stick calibration. */
 #include "gfx_settings.h"
 #include "gxm_resolution.h"
+#include "bench.h"
 #include "pad_vita.h"
 
 #include <dolphin/pad.h>
@@ -36,7 +37,10 @@ enum {
     ROW_UCF,
     ROW_FPS,
     ROW_CONTROLS,
-    ROW_RESET, // buttons
+#ifdef MELEE_VITA_BENCHMARK
+    ROW_BENCH, // buttons
+#endif
+    ROW_RESET,
     ROW_START,
     ROW_EXIT,
     ROW_COUNT,
@@ -51,6 +55,9 @@ static const char* row_names[ROW_COUNT] = {
     "PARTICLES", "LIVE SCREENS", "V-SYNC", "30 FPS IN BIG MATCHES", "STAGE CUTBACKS",
     "CPU/GPU BOOST", "ASPECT RATIO", "UNLOCK EVERYTHING", "TOURNAMENT RULES",
     "UCF (CONTROLLER FIX)", "SHOW FPS", "CONTROLS",
+#ifdef MELEE_VITA_BENCHMARK
+    "RUN BENCHMARK",
+#endif
     "RESET TO DEFAULT", "SAVE AND START", "SAVE AND EXIT",
 };
 
@@ -70,6 +77,9 @@ static const char* help_text[ROW_COUNT] = {
     "UCF 0.84: dashbacks get a 2-frame window, shield drops stop turning into spot dodges.",
     "Shows FPS, worst frame time and clocks in the top left corner.",
     "X: change which Vita button does what.",
+#ifdef MELEE_VITA_BENCHMARK
+    "Left/Right: 1v1 or 4 players. X: save, play 6 stages (~7 min), write a report.",
+#endif
     "Go back to the defaults: Custom, the way the game ran before (controls are not changed).",
     "Save, then start the game.",
     "Save, then close the game.",
@@ -89,6 +99,12 @@ static const char* vita_button_names[MELEE_VITA_BUTTON_COUNT] = {
 #define STAGES_BACK GFX_STAGE_COUNT
 
 static uint8_t mapping[MELEE_VITA_BUTTON_COUNT];
+#ifdef MELEE_VITA_BENCHMARK
+static int bench_players = 2;
+#define FIRST_BUTTON_ROW ROW_BENCH
+#else
+#define FIRST_BUTTON_ROW ROW_RESET
+#endif
 
 static void draw_row(vita2d_pgf* font, int y, int selected, const char* name, const char* value);
 
@@ -320,6 +336,9 @@ static void change(GfxSettings* s, int row, int dir)
     case ROW_TOURNEY: s->tournament = !s->tournament; break;
     case ROW_UCF: s->ucf = !s->ucf; break;
     case ROW_FPS: s->show_fps = !s->show_fps; break;
+#ifdef MELEE_VITA_BENCHMARK
+    case ROW_BENCH: bench_players = bench_players == 4 ? 2 : 4; return;
+#endif
     default: return;
     }
     gfx_settings_changed(); // anything off the preset's values makes it Custom
@@ -354,6 +373,9 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
     case ROW_TOURNEY: snprintf(out, size, "%s", s->tournament ? "NEXT TIME VS OPENS" : "OFF"); break;
     case ROW_UCF: snprintf(out, size, "%s", on_off(s->ucf)); break;
     case ROW_FPS: snprintf(out, size, "%s", on_off(s->show_fps)); break;
+#ifdef MELEE_VITA_BENCHMARK
+    case ROW_BENCH: snprintf(out, size, "%s", bench_players == 4 ? "4 PLAYERS" : "1 VS 1"); break;
+#endif
     case ROW_STAGES: {
         int n = 0;
         for (int i = 0; i < GFX_STAGE_COUNT; i++) n += ((s->stage_lite | s->stage_potato) >> i) & 1;
@@ -387,7 +409,7 @@ void settings_app_run(void)
     int page = PAGE_MAIN;
     int row = 0, sub_row = 0;
     int held = 0;
-    int action = -1; // ROW_START / ROW_EXIT / 0 for quit without saving
+    int action = -1; // ROW_START / ROW_EXIT / ROW_BENCH / 0 for quit without saving
 
     gfx_settings_load();
     // controls live in control-settings.bin (pad.c), shared with the
@@ -434,14 +456,19 @@ void settings_app_run(void)
         if (page == PAGE_MAIN) {
             if (pressed & SCE_CTRL_UP) row = (row + ROW_COUNT - 1) % ROW_COUNT;
             if (pressed & SCE_CTRL_DOWN) row = (row + 1) % ROW_COUNT;
-            if ((pressed & SCE_CTRL_CROSS) && row < ROW_RESET && row != ROW_STAGES && row != ROW_CONTROLS)
+            if ((pressed & SCE_CTRL_CROSS) && row < FIRST_BUTTON_ROW && row != ROW_STAGES &&
+                row != ROW_CONTROLS)
                 dir = 1;
+            // left/right on the benchmark row picks 1v1 / 4 players, X runs it
             if (dir) change(&g_gfx, row, dir);
             if (pressed & SCE_CTRL_CROSS) {
                 if (row == ROW_STAGES) { page = PAGE_STAGES; sub_row = 0; }
                 if (row == ROW_CONTROLS) { page = PAGE_CONTROLS; sub_row = 0; }
                 if (row == ROW_RESET) gfx_settings_reset();
                 if (row == ROW_START || row == ROW_EXIT) action = row;
+#ifdef MELEE_VITA_BENCHMARK
+                if (row == ROW_BENCH) action = row;
+#endif
             }
             if (pressed & SCE_CTRL_CIRCLE) action = 0;
             help = help_text[row];
@@ -507,7 +534,7 @@ void settings_app_run(void)
                 for (int i = 0; i < ROW_COUNT; i++) {
                     int y = 90 + i * 20;
                     if (i >= ROW_BOOST) y += 8; // gap before the options presets don't touch
-                    if (i >= ROW_RESET) y += 8; // and before the buttons
+                    if (i >= FIRST_BUTTON_ROW) y += 8; // and before the buttons
                     value_text(&g_gfx, i, val, sizeof(val));
                     if (i == ROW_STAGES || i == ROW_CONTROLS) {
                         char name[48];
@@ -569,6 +596,12 @@ void settings_app_run(void)
     if (font) vita2d_free_pgf(font);
     vita2d_fini();
 
+#ifdef MELEE_VITA_BENCHMARK
+    if (action == ROW_BENCH) {
+        melee_vita_bench_request(bench_players);
+        action = ROW_START;
+    }
+#endif
     if (action == ROW_START) {
         // start fresh without the -settings param
         sceAppMgrLoadExec("app0:eboot.bin", NULL, NULL);
