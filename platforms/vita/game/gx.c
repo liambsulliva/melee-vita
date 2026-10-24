@@ -4190,6 +4190,7 @@ int g_melee_vita_copy_every_frame;
  * Vita build can change them at boot. PS5 keeps the defaults. */
 u32 g_melee_vita_copy_interval = MELEE_VITA_COPY_INTERVAL;
 u32 g_melee_vita_particle_limit = 512u;
+int g_melee_vita_skip_stage_particles; // per-stage cutback, set at match start
 
 static void copy_tex_impl(void* destination, GXBool clear)
 {
