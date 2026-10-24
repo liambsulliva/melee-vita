@@ -24,6 +24,9 @@ typedef struct GfxSettings {
     int boost;        /* 444/222/222/166 MHz clocks, off unless you turn it on */
     int widescreen;   /* 1 = 16:9 matches, 0 = 4:3 everywhere (pillarboxed) */
     int show_fps;
+    int unlock_all;   /* every character and stage, never saved to the card */
+    int tournament;   /* set the competitive VS rules once, next time VS opens */
+    int ucf;          /* UCF 0.84: easier dashbacks and shield drops */
 } GfxSettings;
 
 /* Legal stages that have a cutback switch (stage_lite bits). */
@@ -65,6 +68,10 @@ const char* gfx_settings_preset_name(int preset);
 
 /* Push g_gfx into the game: clocks, particle limit, live screen rate. */
 void gfx_settings_apply(void);
+
+/* gmvsmelee.c: the tournament rules went into the VS rules. Turns the
+ * switch back off in graphics.txt so it only happens the once. */
+void gfx_settings_tournament_applied(void);
 
 /* grdisplay.c: potato mode skips some decorative stage parts */
 int melee_vita_stage_part_hidden(int part);

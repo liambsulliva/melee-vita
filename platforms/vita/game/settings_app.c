@@ -31,6 +31,9 @@ enum {
     ROW_STAGES,
     ROW_BOOST, // from here down: not part of a preset
     ROW_ASPECT,
+    ROW_UNLOCK,
+    ROW_TOURNEY,
+    ROW_UCF,
     ROW_FPS,
     ROW_CONTROLS,
     ROW_RESET, // buttons
@@ -46,7 +49,8 @@ static const int live_steps[] = { 1, 2, 4, 8, 16 };
 static const char* row_names[ROW_COUNT] = {
     "PRESET", "GAMEPLAY RESOLUTION", "FRAME RATE",
     "PARTICLES", "LIVE SCREENS", "V-SYNC", "30 FPS IN BIG MATCHES", "STAGE CUTBACKS",
-    "CPU/GPU BOOST", "ASPECT RATIO", "SHOW FPS", "CONTROLS",
+    "CPU/GPU BOOST", "ASPECT RATIO", "UNLOCK EVERYTHING", "TOURNAMENT RULES",
+    "UCF (CONTROLLER FIX)", "SHOW FPS", "CONTROLS",
     "RESET TO DEFAULT", "SAVE AND START", "SAVE AND EXIT",
 };
 
@@ -61,6 +65,9 @@ static const char* help_text[ROW_COUNT] = {
     "X: per-stage switches that hide decorative stage effects to save time.",
     "Runs the CPU at 444 MHz and the GPU at 222 MHz with any preset. Uses more battery.",
     "16:9 fills the screen in matches. 4:3 is the original picture, with black bars at the sides.",
+    "All characters and stages, while this is on. Your save is not changed.",
+    "Next time VS opens: 4 stocks, 8 min, items off, team attack on, pause off, legal stages. Once.",
+    "UCF 0.84: dashbacks get a 2-frame window, shield drops stop turning into spot dodges.",
     "Shows FPS, worst frame time and clocks in the top left corner.",
     "X: change which Vita button does what.",
     "Go back to the defaults: Custom, the way the game ran before (controls are not changed).",
@@ -309,6 +316,9 @@ static void change(GfxSettings* s, int row, int dir)
     case ROW_VSYNC: s->vsync = !s->vsync; break;
     case ROW_HEAVY30: s->heavy30 = !s->heavy30; break;
     case ROW_ASPECT: s->widescreen = !s->widescreen; break;
+    case ROW_UNLOCK: s->unlock_all = !s->unlock_all; break;
+    case ROW_TOURNEY: s->tournament = !s->tournament; break;
+    case ROW_UCF: s->ucf = !s->ucf; break;
     case ROW_FPS: s->show_fps = !s->show_fps; break;
     default: return;
     }
@@ -340,6 +350,9 @@ static void value_text(const GfxSettings* s, int row, char* out, int size)
     case ROW_VSYNC: snprintf(out, size, "%s", on_off(s->vsync)); break;
     case ROW_HEAVY30: snprintf(out, size, "%s", on_off(s->heavy30)); break;
     case ROW_ASPECT: snprintf(out, size, "%s", s->widescreen ? "16:9 (WIDESCREEN)" : "4:3"); break;
+    case ROW_UNLOCK: snprintf(out, size, "%s", on_off(s->unlock_all)); break;
+    case ROW_TOURNEY: snprintf(out, size, "%s", s->tournament ? "NEXT TIME VS OPENS" : "OFF"); break;
+    case ROW_UCF: snprintf(out, size, "%s", on_off(s->ucf)); break;
     case ROW_FPS: snprintf(out, size, "%s", on_off(s->show_fps)); break;
     case ROW_STAGES: {
         int n = 0;
