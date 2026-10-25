@@ -165,8 +165,8 @@ void ftCo_80091BC4(Fighter* fp)
     }
     fp->mv.co.guard.x8 = 10 + guard_deg;
 
-    stick_mag = sqrtf(fp->input.lstick[0].x * fp->input.lstick[0].x +
-                      fp->input.lstick[0].y * fp->input.lstick[0].y);
+    stick_mag = sqrtf(MU_P(fp->input.lstick[0].x * fp->input.lstick[0].x) +
+                      MU_P(fp->input.lstick[0].y * fp->input.lstick[0].y));
     if (stick_mag > 1) {
         stick_mag = 1;
     }
@@ -414,10 +414,10 @@ bool ftCo_800925A4(HSD_GObj* gobj)
                        p_ftCommonData->analog_shoulder_deadzone) /
                           (1 - p_ftCommonData->analog_shoulder_deadzone);
         }
-        fp->shield_health -= p_ftCommonData->x278 *
+        fp->shield_health -= MU_P(p_ftCommonData->x278 *
                              ((fp->lightshield_amount *
                                (p_ftCommonData->x2F0 - p_ftCommonData->x2EC)) +
-                              p_ftCommonData->x2EC);
+                              p_ftCommonData->x2EC));
         if (fp->shield_health < 0) {
             fp->shield_health = 0;
             fp->x221A_b7 = false;

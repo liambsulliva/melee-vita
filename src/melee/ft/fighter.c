@@ -2216,12 +2216,12 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
                     {
                         p_kb_vel->x = p_kb_vel->y = 0;
                     } else {
-                        p_kb_vel->x -=
-                            p_ftCommonData->x204_knockbackFrameDecay *
-                            cosf(kb_angle);
-                        p_kb_vel->y -=
-                            p_ftCommonData->x204_knockbackFrameDecay *
-                            sinf(kb_angle);
+                        p_kb_vel->x = mu_fnmsubs(
+                            p_ftCommonData->x204_knockbackFrameDecay,
+                            cosf(kb_angle), p_kb_vel->x);
+                        p_kb_vel->y = mu_fnmsubs(
+                            p_ftCommonData->x204_knockbackFrameDecay,
+                            sinf(kb_angle), p_kb_vel->y);
                     }
                 }
 
@@ -2270,12 +2270,12 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
                     // p_stc_ftcommon->x3e8_shield_kb_frameDecay)/atkShieldKB_len
                     // float atkShieldKBAngle = atan2_80022C30(pAtkShieldKB->y,
                     // pAtkShieldKB->x);
-                    pAtkShieldKB->x -=
-                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay *
-                        cosf(atkShieldKBAngle);
-                    pAtkShieldKB->y -=
-                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay *
-                        sinf(atkShieldKBAngle);
+                    pAtkShieldKB->x = mu_fnmsubs(
+                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay,
+                        cosf(atkShieldKBAngle), pAtkShieldKB->x);
+                    pAtkShieldKB->y = mu_fnmsubs(
+                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay,
+                        sinf(atkShieldKBAngle), pAtkShieldKB->y);
                 }
                 fp->xF4_ground_attacker_shield_kb_vel = 0;
             } else {

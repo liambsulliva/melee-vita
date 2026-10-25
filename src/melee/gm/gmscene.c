@@ -344,6 +344,13 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
         }
 #endif
         for (i = 0; i < pad_queue_count; i++) {
+#if defined(TARGET_VITA) && defined(MELEE_VITA_EXACT_MATH)
+            /* Exact-maths builds time every update for slippi.log
+             * (platforms/vita/fp/fp_check.c). */
+            extern u64 sceKernelGetProcessTimeWide(void);
+            extern void melee_vita_fp_note_update(unsigned microseconds);
+            u64 vita_update_start_us = sceKernelGetProcessTimeWide();
+#endif
             HSD_PerfSetStartTime();
             lb_800198E0();
             if (DbLevel >= DbLKind_DebugRom) {
@@ -398,6 +405,10 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
                 }
             }
             HSD_PerfSetCPUTime();
+#if defined(TARGET_VITA) && defined(MELEE_VITA_EXACT_MATH)
+            melee_vita_fp_note_update(
+                (unsigned) (sceKernelGetProcessTimeWide() - vita_update_start_us));
+#endif
             if (DbLevel >= DbLKind_DebugRom) {
                 OSCheckActiveThreads();
             }

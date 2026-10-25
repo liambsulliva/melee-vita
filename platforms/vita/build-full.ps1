@@ -36,7 +36,11 @@ param(
     [string]$VitaBuildNumber = $env:MELEE_VITA_BUILD_NUMBER,
     [switch]$EnableUpdater,
     [ValidatePattern('^[0-9A-Fa-f]{64}$')]
-    [string]$UpdaterPublicKeyHex
+    [string]$UpdaterPublicKeyHex,
+    # Slippi Direct play: GameCube-exact floating point.  Needs a host C++
+    # compiler and the GMP headers to build tools/gcc_fp_contract.
+    [switch]$EnableExactMath,
+    [string]$HostCxx = $(if ($env:CXX) { $env:CXX } else { 'g++' })
 )
 
 $ErrorActionPreference = 'Stop'
@@ -273,6 +277,34 @@ function Invoke-VitaTool([string]$Name, [string[]]$Arguments) {
     }
 }
 
+# The GCC plugin that rounds a*b+c like the GameCube (tools/gcc_fp_contract).
+# It is a host program loaded by arm-vita-eabi-gcc, so it is built with the
+# host's C++ compiler against the plugin headers that come with VitaSDK.
+$fpContractPlugin = $null
+if ($EnableExactMath) {
+    if ($IsWindows) {
+        throw '-EnableExactMath needs a Linux or macOS VitaSDK: the Windows build of GCC cannot load plugins. Use WSL or the CI build.'
+    }
+    $pluginSource = Join-Path $root 'tools/gcc_fp_contract/fp_contract_plugin.cc'
+    $fpContractPlugin = Join-Path $build 'fp_contract_plugin.so'
+    $pluginHeaders = (& (Join-Path $VitaSdk 'bin/arm-vita-eabi-gcc') '-print-file-name=plugin').Trim()
+    $pluginHeaders = Join-Path $pluginHeaders 'include'
+    if (-not (Test-Path -LiteralPath (Join-Path $pluginHeaders 'gcc-plugin.h'))) {
+        throw "VitaSDK has no GCC plugin headers at $pluginHeaders."
+    }
+    New-Item -ItemType Directory -Force -Path $build | Out-Null
+    if (-not (Test-Path -LiteralPath $fpContractPlugin) -or
+        (Get-Item $pluginSource).LastWriteTimeUtc -gt (Get-Item $fpContractPlugin).LastWriteTimeUtc) {
+        $pluginFlags = @('-std=gnu++17', '-shared', '-fPIC', '-fno-rtti', '-O2', "-I$pluginHeaders")
+        # macOS: the plugin's GCC symbols come from cc1 when it loads.
+        if ($IsMacOS) { $pluginFlags += @('-undefined', 'dynamic_lookup') }
+        & $HostCxx @pluginFlags $pluginSource '-o' $fpContractPlugin
+        if ($LASTEXITCODE -ne 0) {
+            throw "Building the FP contraction plugin failed. It needs a host C++ compiler ($HostCxx) and GMP headers (libgmp-dev, or brew install gmp)."
+        }
+    }
+}
+
 $gameArchive = & (Join-Path $PSScriptRoot 'build-game.ps1') `
     -VitaSdk $VitaSdk -BuildDirectory (Join-Path $build 'game') `
     -Configuration $Configuration -Jobs $Jobs `
@@ -281,6 +313,8 @@ $gameArchive = & (Join-Path $PSScriptRoot 'build-game.ps1') `
     -EnableDirectSnag:$EnableDirectSnag `
     -EnableRenderTrace:$EnableRenderTrace `
     -EnableRuntimeResolutionMenu:$EnableRuntimeResolutionMenu `
+    -EnableExactMath:$EnableExactMath `
+    -FpContractPlugin $fpContractPlugin `
     -VitaReleaseVersion $version.release `
     -VitaBuildNumber $VitaBuildNumber |
     Select-Object -Last 1
@@ -343,6 +377,28 @@ $slippiSources = @(
     'platforms/vita/slippi/slippi_selftest.c'
 )
 $platformSources += $slippiSources
+# Exact maths (platforms/vita/fp): the console's sqrtf, fma, frsqrte, fres
+# and paired-single matrix routines, plus the boot check.
+$fpSources = @()
+if ($EnableExactMath) {
+    $fpSources = @(
+        'platforms/vita/fp/fp_check.c',
+        'platforms/vita/fp/fp_exact.c',
+        'platforms/vita/fp/ppc_math.c',
+        'platforms/vita/fp/ps_math.c'
+    )
+    $platformSources += $fpSources
+}
+# aurora's C matrix routines stand in for the console's C ones (C_MTXLookAt,
+# VECSquareMag, ...), so exact builds compile them like game code.
+$consoleMathSources = @(
+    'extern/aurora/lib/dolphin/mtx/mtx.c',
+    'extern/aurora/lib/dolphin/mtx/mtx44.c',
+    'extern/aurora/lib/dolphin/mtx/mtxstack.c',
+    'extern/aurora/lib/dolphin/mtx/mtxvec.c',
+    'extern/aurora/lib/dolphin/mtx/quat.c',
+    'extern/aurora/lib/dolphin/mtx/vec.c'
+)
 if ($EnableUpdater) {
     $platformSources += @(
         'platforms/vita/updater/homebrew_update_client.c',
@@ -410,6 +466,10 @@ if ($EnableLiveProfiler) {
     }
 }
 $common += '-DMELEE_VITA_GPU_BUMP_DL=1'
+if ($EnableExactMath) {
+    # main.c runs platforms/vita/fp/fp_check.c at boot.
+    $common += '-DMELEE_VITA_EXACT_MATH_CHECK=1'
+}
 if ($UseCpuVertexPath) {
     $common += '-DMELEE_VITA_GX_CPU_VERTEX=1'
 }
@@ -453,6 +513,25 @@ $platformObjects = foreach ($relative in $platformSources) {
         # libuvdb is a native VitaSDK library and uses the platform's compact
         # enum ABI. Keep this boundary isolated from Melee's four-byte enums.
         $sourceFlags = $sourceFlags + '-fshort-enums'
+    }
+    if ($consoleMathSources -contains $relative) {
+        # aurora's matrix code carries the 3DS port's MU_P annotations.
+        $sourceFlags = $sourceFlags + @('-include', (Join-Path $root 'platforms/vita/fp/mp_fp.h'))
+    }
+    if ($EnableExactMath -and (($fpSources -contains $relative) -or ($consoleMathSources -contains $relative))) {
+        # These files round like the console, so GCC may not reorder or
+        # fuse their float maths.
+        $sourceFlags = @($sourceFlags | Where-Object {
+            $_ -notin @('-funsafe-math-optimizations', '-fno-signed-zeros', '-ffp-contract=fast')
+        }) + '-ffp-contract=off'
+        if ($consoleMathSources -contains $relative) {
+            # aurora's C matrix code stands in for the console's C, so it
+            # gets the console's a*b+c rounding like the game code.
+            $sourceFlags += @(
+                "-fplugin=$fpContractPlugin",
+                "-fplugin-arg-fp_contract_plugin-no-contract=$(Join-Path $root 'tools/slippi/no_contract.txt')"
+            )
+        }
     }
     if ($slippiSources -contains $relative) {
         # ENet and the 3DS client are kept as upstream wrote them, so these
