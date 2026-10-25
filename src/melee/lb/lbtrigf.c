@@ -144,7 +144,7 @@ static const float atanf_lookup[] = {
     0.0,
 };
 
-#ifdef __MWERKS__
+#if 1 /* Slippi: the console atanf */
 float atanf(float x)
 {
     float const silver_ratio = 2.4142136573791504f;

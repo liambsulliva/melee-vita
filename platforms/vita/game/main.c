@@ -20,6 +20,9 @@ unsigned int _newlib_heap_size_user = 128u * 1024u * 1024u;
 int sceUserMainThreadStackSize = 4 * 1024 * 1024;
 
 int melee_main(void);
+#ifdef MELEE_VITA_EXACT_MATH_CHECK
+void melee_vita_fp_check(void);
+#endif
 
 int main(void)
 {
@@ -58,6 +61,11 @@ int main(void)
      * It goes before the updater so the two don't share the network yet. */
     melee_vita_slippi_netcheck();
     melee_vita_slippi_directtest();
+#ifdef MELEE_VITA_EXACT_MATH_CHECK
+    /* Exact-maths builds log the FPSCR and check the console maths
+     * (platforms/vita/fp/fp_check.c) into slippi.log. */
+    melee_vita_fp_check();
+#endif
 
     melee_vita_log_info("Platform initialized; entering melee_main");
 #ifdef MELEE_VITA_UPDATER

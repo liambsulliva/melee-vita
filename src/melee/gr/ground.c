@@ -3058,7 +3058,7 @@ void Ground_801C4FAC(HSD_CObj* cobj)
                 dz = sp2C.z;
                 dz -= sp20.z;
                 dx2 = dx * dx;
-                dy2 = (sp2C.y - sp20.y) * (sp2C.y - sp20.y);
+                dy2 = MU_P((sp2C.y - sp20.y) * (sp2C.y - sp20.y));
                 dz2 = dz * dz;
                 phi_f30 = sqrtf_store(dx2 + dy2 + dz2, &sqrt_tmp[0]);
                 if (phi_f30 < 10) {
