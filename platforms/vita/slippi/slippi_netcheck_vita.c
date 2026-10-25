@@ -96,7 +96,9 @@ static void disconnect_politely(ENetHost* host, ENetPeer* peer)
             return;
         }
     }
-    /* No answer: drop it on our side. */
+    /* No answer.  mm.slippi.gg didn't confirm in the first hardware test
+     * either, which is harmless: drop it on our side. */
+    sp_log("netcheck: server didn't confirm the disconnect, dropping the connection");
     enet_peer_reset(peer);
 }
 
@@ -171,8 +173,9 @@ static int run_netcheck(void)
     enet_host_flush(host);
     connected = wait_for_connect(host, peer, NETCHECK_CONNECT_TIMEOUT_MS);
     if (connected) {
-        sp_log("netcheck: step 6 ok, matchmaking server answered, round trip %u ms",
-               (unsigned int) peer->roundTripTime);
+        /* peer->roundTripTime is still ENet's 500 ms starting guess here,
+         * so the handshake time logged above is the better number. */
+        sp_log("netcheck: step 6 ok, matchmaking server answered");
         disconnect_politely(host, peer);
     } else {
         sp_log("netcheck: FAIL at step 6, no ENet handshake with %s:%d", server_ip,

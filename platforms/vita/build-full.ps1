@@ -333,6 +333,7 @@ $slippiSources = @(
     'platforms/vita/slippi/enet/unix.c',
     'platforms/vita/slippi/slippi_bridge.c',
     'platforms/vita/slippi/slippi_config.c',
+    'platforms/vita/slippi/slippi_directtest_vita.c',
     'platforms/vita/slippi/slippi_json.c',
     'platforms/vita/slippi/slippi_mm.c',
     'platforms/vita/slippi/slippi_net.c',
