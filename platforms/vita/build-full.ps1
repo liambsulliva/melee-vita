@@ -317,8 +317,31 @@ $platformSources = @(
     'platforms/vita/game/profiler_live.c',
     'platforms/vita/game/thp.c',
     'platforms/vita/game/vi.c',
+    'platforms/vita/game/vita_net.c',
     'platforms/vita/game/widescreen.c'
 )
+# Slippi Direct play: ENet and the network client from the 3DS port
+# (platforms/vita/slippi), plus the Vita platform layer for it.
+$slippiSources = @(
+    'platforms/vita/slippi/enet/callbacks.c',
+    'platforms/vita/slippi/enet/compress.c',
+    'platforms/vita/slippi/enet/host.c',
+    'platforms/vita/slippi/enet/list.c',
+    'platforms/vita/slippi/enet/packet.c',
+    'platforms/vita/slippi/enet/peer.c',
+    'platforms/vita/slippi/enet/protocol.c',
+    'platforms/vita/slippi/enet/unix.c',
+    'platforms/vita/slippi/slippi_bridge.c',
+    'platforms/vita/slippi/slippi_config.c',
+    'platforms/vita/slippi/slippi_json.c',
+    'platforms/vita/slippi/slippi_mm.c',
+    'platforms/vita/slippi/slippi_net.c',
+    'platforms/vita/slippi/slippi_netcheck_vita.c',
+    'platforms/vita/slippi/slippi_p2p.c',
+    'platforms/vita/slippi/slippi_plat_vita.c',
+    'platforms/vita/slippi/slippi_selftest.c'
+)
+$platformSources += $slippiSources
 if ($EnableUpdater) {
     $platformSources += @(
         'platforms/vita/updater/homebrew_update_client.c',
@@ -430,6 +453,15 @@ $platformObjects = foreach ($relative in $platformSources) {
         # enum ABI. Keep this boundary isolated from Melee's four-byte enums.
         $sourceFlags = $sourceFlags + '-fshort-enums'
     }
+    if ($slippiSources -contains $relative) {
+        # ENet and the 3DS client are kept as upstream wrote them, so these
+        # two warnings (unused ENet callback parameters, and snprintf into
+        # fixed buffers on purpose) stay off for them only.
+        $sourceFlags = $sourceFlags + @(
+            "-I$(Join-Path $root 'platforms/vita/slippi/enet/include')",
+            '-Wno-unused-parameter', '-Wno-format-truncation'
+        )
+    }
     Invoke-VitaTool 'arm-vita-eabi-gcc' ($sourceFlags + @($source, '-o', $object))
     $object
 }
@@ -469,6 +501,8 @@ if ($EnableLiveProfiler) {
                '-lSceNetPs_stub')
 }
 $link += @(
+    # Slippi Direct play needs sockets in every build, not only Debug.
+    '-lSceNet_stub', '-lSceNetCtl_stub',
     '-lSceCtrl_stub', '-lSceDisplay_stub', '-lSceAudio_stub', '-lSceJpeg_stub', '-lSceKernelThreadMgr_stub',
     '-lvita2d', '-lSceGxm_stub', '-lSceDisplay_stub', '-lSceAppMgr_stub',
     '-lSceTouch_stub',
