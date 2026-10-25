@@ -2,6 +2,7 @@
 #include "vita_platform.h"
 #include "profiler_live.h"
 #include "../vita_log.h"
+#include "../slippi/slippi_netcheck_vita.h"
 #ifdef MELEE_VITA_UPDATER
 #include "../updater/update_runtime.h"
 #endif
@@ -50,6 +51,10 @@ int main(void)
         printf("Melee Vita: debugger startup failed\n");
     }
 #endif
+
+    /* Slippi bring-up: only runs when netcheck.txt is on the memory card.
+     * It goes before the updater so the two don't share the network yet. */
+    melee_vita_slippi_netcheck();
 
     melee_vita_log_info("Platform initialized; entering melee_main");
 #ifdef MELEE_VITA_UPDATER
