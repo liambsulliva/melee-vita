@@ -1,3 +1,4 @@
+#include <melee/slippi/slippi_ucf.h>
 #include "ftCo_Guard.h"
 
 #include <math.h>
@@ -721,7 +722,7 @@ void ftCo_80093240(Fighter_GObj* gobj)
         if ((fp->input.lstick[0].x < 0 ? -fp->input.lstick[0].x
                                        : fp->input.lstick[0].x) >=
                 p_ftCommonData->sdi_min_stick_mag &&
-            fp->active_timer.lstick.x < p_ftCommonData->sdi_stick_window)
+            (fp->active_timer.lstick.x < p_ftCommonData->sdi_stick_window || mp_ucf_shield_sdi(fp)))
         {
             float scl = p_ftCommonData->x4C0 * (fp->input.lstick[0].x *
                                                 p_ftCommonData->sdi_pos_scale);

@@ -1217,6 +1217,17 @@ void melee_vita_gxm_queue_overlay_full_width(vita2d_texture* texture, u32 width,
     queue_overlay(texture, width, height, true);
 }
 
+/* Only the Vita's Slippi replay test uses the screen overlay so far. */
+void melee_vita_gxm_set_screen_overlay(
+    const MeleeVitaScreenVertex* triangles, u32 triangle_vertex_count,
+    const MeleeVitaScreenVertex* lines, u32 line_vertex_count)
+{
+    (void) triangles;
+    (void) triangle_vertex_count;
+    (void) lines;
+    (void) line_vertex_count;
+}
+
 /* ===================================================================
  * Init, present, shutdown
  * =================================================================== */

@@ -1,3 +1,4 @@
+#include <melee/slippi/slippi_rules.h>
 #include "ftCo_0A01.h"
 
 #include <Runtime/platform.h>

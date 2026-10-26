@@ -23,4 +23,8 @@ typedef struct DebugFontGlyph {
                                void*);
 /* 4088B8 */ extern DebugFontGlyph HSD_DebugFontAtlas[];
 
+#ifdef TARGET_VITA
+const u8* HSD_DebugFontStrokes(int chr);
+#endif
+
 #endif

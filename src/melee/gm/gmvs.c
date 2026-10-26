@@ -1,4 +1,6 @@
+#include <melee/slippi/slippi_rules.h>
 #include "gmvs.h"
+#include <melee/slippi/slippi_replay.h>
 
 #include <Runtime/platform.h>
 
@@ -1426,6 +1428,7 @@ void fn_8016CFE0(void)
         goto block_50;
     } else {
         tmp->state.match_result = gm_GetMatchOutcome();
+        mp_slippi_replay_scene_think(tmp->state.match_result);
         if (tmp->state.match_result == OUTCOME_NONE) {
             gm_DoPauseChecksAndRoutine(tmp, 1);
             if (tmp->state.unpause_timer != 0) {
@@ -1446,6 +1449,11 @@ void fn_8016CFE0(void)
         gm_SetDbPauseFlag(4);
         tmp->state.unk_0 = 1;
     } else {
+        if (mp_slippi_replay_terminated()) {
+            /* The replay test ran out of recorded frames: end the match. */
+            fn_8016CF4C(-1, OUTCOME_NO_CONTEST);
+            return;
+        }
         fn_8016CD98(tmp);
     }
 }
@@ -1986,6 +1994,7 @@ void fn_8016E2BC(void)
                     }
                 }
                 Player_80032768(i, &sp18);
+                mp_slippi_neutral_spawn(i, controller.start.is_teams);
                 is_teams = controller.start.is_teams == true;
                 Player_SetUnk45(
                     i, fn_80160840(gm_80160854(Player_GetPlayerId(i),
@@ -2034,7 +2043,9 @@ void fn_8016E730(StartMeleeData* arg0)
     HSD_GObj* temp_r30;
     VsSceneController* r30;
 
+    mp_slippi_rules_match_start();
     db_Setup();
+    mp_slippi_replay_start_melee(arg0);
     gm_SetDbPauseInputHandlers(gm_AnyControllerPressedStart,
                                gm_AnyControllerPressedZ);
     gm_SetPreGObjProcCallback(db_RunEveryFrame);
@@ -2132,6 +2143,7 @@ void gm_Scene_Vs_OnExit(void* user_data)
     VsSceneController* tmp = &controller;
     int i;
 
+    mp_slippi_replay_match_exit();
     if (controller.state.match_over == 0) {
         data->xC = controller.state.x24C;
         data->xC.is_teams = controller.start.is_teams;

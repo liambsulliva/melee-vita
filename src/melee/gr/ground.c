@@ -1,3 +1,5 @@
+#include <melee/slippi/slippi_rules.h>
+#include <string.h>
 #include "ground.h"
 
 #include <Runtime/platform.h>
@@ -860,6 +862,10 @@ Ground_GObj* Ground_GetStageGObj(int map_id)
      * @c on_init writes it sees stale heap contents.
      */
     gp = alloc_user_data_ground();
+    if (gp != NULL && mp_slippi_rule(MP_SR_INIT_STAGE)) {
+        _Static_assert(sizeof(Ground) == 516, "Ground block size");
+        memset(gp, 0, 516);
+    }
     if (gp == NULL) {
         HSD_GObjFree(gobj);
         return NULL;

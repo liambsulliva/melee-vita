@@ -1,3 +1,5 @@
+#include <melee/slippi/slippi_ucf.h>
+#include <melee/slippi/slippi_rules.h>
 #include "ftCo_Damage.h"
 
 #include <Runtime/platform.h>
@@ -506,7 +508,7 @@ void ftCo_Damage_OnEveryHitlag(Fighter_GObj* gobj)
         VEC2_SQ_LEN(fp->input.lstick[0]) >=
             MU_P(SQ(p_ftCommonData->sdi_min_stick_mag)) &&
         (fp->active_timer.lstick.x < p_ftCommonData->sdi_stick_window ||
-         fp->active_timer.lstick.y < p_ftCommonData->sdi_stick_window))
+         fp->active_timer.lstick.y < p_ftCommonData->sdi_stick_window || mp_ucf_sdi(fp)))
     {
         float scaled_lstick_x =
             fp->input.lstick[0].x * p_ftCommonData->sdi_pos_scale;
@@ -744,6 +746,27 @@ static inline void inlineB2(Fighter_GObj* gobj)
     ftCommon_800804FC(fp);
 }
 
+static inline void inlineB2_wobble(Fighter_GObj* gobj)
+{
+    Fighter* fp = gobj->user_data;
+    ftCo_800C8D00(gobj);
+    if (!mp_slippi_wobble_check(gobj)) {
+        if (fp->motion_id == 0xe0 || fp->motion_id == 0xe1) {
+            ftCo_800DC284(gobj);
+        }
+        if (fp->motion_id == 0xe3 || fp->motion_id == 0xe4) {
+            ftCo_800DC3A4(gobj);
+        }
+    }
+    if (ftCo_8008DA4C(
+            gobj, fp->dmg.x1860_element,
+            ftCo_8008D8E8(fp->dmg.kb_applied * p_ftCommonData->x154)))
+    {
+        ftCo_800C0408(gobj);
+    }
+    ftCommon_800804FC(fp);
+}
+
 static inline void inlineB4(Fighter_GObj* gobj)
 {
     ftCo_8008E9D0(gobj);
@@ -821,7 +844,7 @@ void ftCo_8008EC90(Fighter_GObj* gobj)
                         }
                     }
                     fp->input.pressed_buttons = fp->input.released_buttons = 0;
-                    inlineB2(gobj);
+                    inlineB2_wobble(gobj);
                     goto ret_A8C;
                 }
                 {

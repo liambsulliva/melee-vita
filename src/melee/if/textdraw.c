@@ -10,6 +10,7 @@
 #ifdef TARGET_VITA
 #include <gxm_game.h>
 #include <melee/mn/mnvitadebug.h>
+#include <melee/slippi/slippi_replay.h>
 #endif
 #include <sysdolphin/baselib/cobj.h>
 #include <sysdolphin/baselib/fog.h>
@@ -309,6 +310,11 @@ void DevText_DrawAll(HSD_GObj* gobj, int pass)
                 x += DrawASCII(controls[i], x, 458.0f, (GXColor*) &help);
             }
         }
+#endif
+#ifdef TARGET_VITA
+        /* The Slippi replay test's progress panel.  The renderer draws it
+         * over the finished frame, without GX. */
+        mp_slippi_replay_draw_panel();
 #endif
         while (text) {
             DevText_Draw(text);

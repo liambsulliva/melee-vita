@@ -1921,13 +1921,88 @@ void melee_vita_gxm_queue_overlay_full_width(vita2d_texture* texture,
     queue_overlay(texture, width, height, true);
 }
 
+/* ---- screen overlay ---- */
+
+/* What the game set for this frame (game thread only).  Present copies it
+ * into the frame's GPU memory, after the submit worker has drained. */
+static const MeleeVitaScreenVertex* s_overlay_triangles;
+static u32 s_overlay_triangle_count;
+static const MeleeVitaScreenVertex* s_overlay_lines;
+static u32 s_overlay_line_count;
+
+void melee_vita_gxm_set_screen_overlay(
+    const MeleeVitaScreenVertex* triangles, u32 triangle_vertex_count,
+    const MeleeVitaScreenVertex* lines, u32 line_vertex_count)
+{
+    s_overlay_triangles = triangles;
+    s_overlay_triangle_count = triangles != NULL ? triangle_vertex_count : 0u;
+    s_overlay_lines = lines;
+    s_overlay_line_count = lines != NULL ? line_vertex_count : 0u;
+}
+
+/* One overlay array into this frame's GPU memory, in vita2d's format. */
+static vita2d_color_vertex* copy_overlay_vertices(
+    const MeleeVitaScreenVertex* vertices, u32 count)
+{
+    vita2d_color_vertex* output;
+    u32 i;
+    if (vertices == NULL || count == 0u) return NULL;
+    output = melee_vita_rq_alloc_gpu(count * sizeof(*output), 16);
+    if (output == NULL) return NULL;
+    for (i = 0; i < count; ++i) {
+        output[i].x = vertices[i].x;
+        output[i].y = vertices[i].y;
+        output[i].z = 0.5f;
+        output[i].color = vertices[i].color;
+    }
+    return output;
+}
+
 /* ---- present ---- */
 
 typedef struct RqPresent {
     f32 bar;
     GxrVertex* vertices;
     u16* indices;
+    vita2d_color_vertex* overlay_triangles;
+    u32 overlay_triangle_count;
+    vita2d_color_vertex* overlay_lines;
+    u32 overlay_line_count;
 } RqPresent;
+
+/* The screen overlay, on the display target at 960 x 544 (render thread). */
+static void draw_screen_overlay(const RqPresent* p)
+{
+    SceGxmContext* context = vita2d_get_context();
+    if (p->overlay_triangles == NULL && p->overlay_lines == NULL) return;
+    /* The epoch tells the GX renderer to set all of its state again,
+     * polygon mode included, before its next draw. */
+    ++g_melee_vita_gxm_state_epoch;
+    sceGxmSetCullMode(context, SCE_GXM_CULL_NONE);
+    rt_set_viewport(
+        MELEE_VITA_DISPLAY_WIDTH, MELEE_VITA_DISPLAY_HEIGHT, false);
+    rt_default_depth();
+    vita2d_set_blend_mode_add(0);
+    sceGxmSetFrontPolygonMode(context, SCE_GXM_POLYGON_MODE_TRIANGLE_FILL);
+    sceGxmSetBackPolygonMode(context, SCE_GXM_POLYGON_MODE_TRIANGLE_FILL);
+    if (p->overlay_triangles != NULL) {
+        vita2d_draw_array(SCE_GXM_PRIMITIVE_TRIANGLES, p->overlay_triangles,
+                          p->overlay_triangle_count);
+    }
+    if (p->overlay_lines != NULL) {
+        /* GXM only draws line primitives in line polygon mode. */
+        sceGxmSetFrontPolygonMode(context, SCE_GXM_POLYGON_MODE_LINE);
+        sceGxmSetBackPolygonMode(context, SCE_GXM_POLYGON_MODE_LINE);
+        sceGxmSetFrontPointLineWidth(context, 1);
+        sceGxmSetBackPointLineWidth(context, 1);
+        vita2d_draw_array(SCE_GXM_PRIMITIVE_LINES, p->overlay_lines,
+                          p->overlay_line_count);
+        /* vita2d's own drawing after this expects filled triangles. */
+        sceGxmSetFrontPolygonMode(context,
+                                  SCE_GXM_POLYGON_MODE_TRIANGLE_FILL);
+        sceGxmSetBackPolygonMode(context, SCE_GXM_POLYGON_MODE_TRIANGLE_FILL);
+    }
+}
 
 static void exec_present_impl(const void* payload);
 static void exec_present(const void* payload)
@@ -1949,6 +2024,8 @@ static void exec_present_impl(const void* payload)
         vita2d_draw_rectangle(0.0f, 0.0f, p->bar + 1.0f, 544.0f, RGBA8(0, 0, 0, 255));
         vita2d_draw_rectangle(960.0f - p->bar - 1.0f, 0.0f, p->bar + 1.0f, 544.0f, RGBA8(0, 0, 0, 255));
     }
+    /* At native resolution the frame is already on the display target. */
+    if (!s_rendering_internal) draw_screen_overlay(p);
     {
         const u64 end_start = sceKernelGetProcessTimeWide();
         vita2d_end_drawing();
@@ -1980,6 +2057,7 @@ static void exec_present_impl(const void* payload)
                 melee_vita_log_info(
                     "[GXM] internal EFB presentation draw unavailable");
         }
+        draw_screen_overlay(p);
         vita2d_end_drawing();
     }
 #ifdef MELEE_VITA_UPDATER
@@ -2028,6 +2106,16 @@ void melee_vita_gxm_present(u32 clear_color)
         p->bar = melee_vita_widescreen_active()
             ? 0.0f
             : (960.0f - 544.0f * (73.0f / 60.0f)) * 0.5f;
+        /* The screen overlay this frame set, if any.  The submit worker has
+         * drained, so the frame's GPU memory is free to use here. */
+        p->overlay_triangles = copy_overlay_vertices(
+            s_overlay_triangles, s_overlay_triangle_count);
+        if (p->overlay_triangles != NULL)
+            p->overlay_triangle_count = s_overlay_triangle_count;
+        p->overlay_lines = copy_overlay_vertices(
+            s_overlay_lines, s_overlay_line_count);
+        if (p->overlay_lines != NULL)
+            p->overlay_line_count = s_overlay_line_count;
         if (resolution_scaling_enabled() && !gxr_available()) {
             recorded->native_reasons |= MELEE_VITA_NATIVE_REASON_READBACK;
         } else if (resolution_scaling_enabled()) {
@@ -2072,6 +2160,8 @@ void melee_vita_gxm_present(u32 clear_color)
             }
         }
     }
+    /* The next frame shows an overlay only if it sets one again. */
+    melee_vita_gxm_set_screen_overlay(NULL, 0u, NULL, 0u);
     native_reasons = effective_native_reasons(recorded->native_reasons);
     if (native_reasons & MELEE_VITA_NATIVE_REASON_COPY)
         ++native_copy_frames;

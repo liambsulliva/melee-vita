@@ -31,6 +31,14 @@ TABLES = [
     ('decomp_fixes.py', 'FIXES'),
     ('determinism.py', 'HAND'),
     ('determinism_ported.py', 'PORTED'),
+    # The call sites of Slippi's gameplay codes (src/melee/slippi/slippi_rules.c).
+    ('online_rules.py', 'FIXES'),
+]
+
+# Names that differ between the 3DS tree and this one, fixed in the new text.
+RENAMES = [
+    ('#include <slippi_rules.h>\n', '#include <melee/slippi/slippi_rules.h>\n'),
+    ('*seed_ptr', '*HSD_RandSeedPtr'),
 ]
 
 # Edits this tree already has, or doesn't want, with the reason.
@@ -81,14 +89,18 @@ def main():
                 continue
             text = path.read_text(encoding='utf-8')
             for old, new, count in edits:
+                for theirs, ours in RENAMES:
+                    new = new.replace(theirs, ours)
                 first_line = old.strip().splitlines()[0][:70]
-                if text.count(old) == count:
+                # Check "already there" first: an edit that only adds lines
+                # next to its anchor still finds the anchor after applying.
+                if new in text:
+                    already += 1
+                    print(f'already  {edit_path}: {first_line}')
+                elif text.count(old) == count:
                     text = text.replace(old, new)
                     applied += 1
                     print(f'applied  {edit_path}: {first_line}')
-                elif new in text:
-                    already += 1
-                    print(f'already  {edit_path}: {first_line}')
                 else:
                     missing += 1
                     found = text.count(old)
