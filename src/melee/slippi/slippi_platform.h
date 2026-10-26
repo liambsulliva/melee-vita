@@ -91,5 +91,8 @@ int mp_platform_slippi_ui_text(int line, char* out, int len);
 int mp_platform_slippi_ui_name(int local, char* out, int len);
 /* Frozen Pokemon Stadium: 1 toggles, 0 reads.  Returns the state. */
 int mp_platform_slippi_ui_alt(int toggle);
+/* 1 when Slippi's patched menu files (tools/slippi/slippi_files.py) are on
+ * the memory card, so the menus can show Slippi's Online Play art. */
+int mp_platform_slippi_menu_files(void);
 
 #endif

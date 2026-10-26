@@ -1288,6 +1288,7 @@ int mp_platform_slippi_ui_alt(int toggle)
     (void) toggle;
     return 0;
 }
+int mp_platform_slippi_menu_files(void) { return 0; }
 
 /* ===================================================================
  * Init, present, shutdown

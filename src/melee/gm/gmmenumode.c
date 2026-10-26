@@ -1,6 +1,8 @@
 #include <melee/lb/forward.h>
 
 #include "gm_1A3F.h"
+#include <melee/slippi/slippi_online.h>
+#include <melee/slippi/slippi_platform.h>
 #include "gm_unsplit.h"
 #include "gmmain_lib.h"
 #include "gmmenumode_return.h"
@@ -106,14 +108,23 @@ void onEnter(GameModeState* scene)
     }
     data->load_assets = 1;
     previous_mode = gm_GetPreviousGameMode();
+    /* Slippi Direct: Slippi's Online Play description and submenu, when its
+     * menu files are on the memory card. */
+    mp_slippi_menu_prepare();
     if (previous_mode == GM_CHALLENGER_APPROACH) {
         previous_mode = gm_801737D8();
     }
     switch (previous_mode) {
     case GM_HANYU_CSS:
-        /* Slippi Direct: back on Online Play. */
-        data->menu_kind = MENU_KIND_1P;
-        data->hovered_selection = SEL_1P_2;
+        /* Slippi Direct: back on Direct in Slippi's Online submenu, or on
+         * Online Play without Slippi's menu files. */
+        if (mp_platform_slippi_menu_files()) {
+            data->menu_kind = 8;
+            data->hovered_selection = 2;
+        } else {
+            data->menu_kind = MENU_KIND_1P;
+            data->hovered_selection = SEL_1P_2;
+        }
         return;
     case GM_CLASSIC:
         data->menu_kind = MENU_KIND_REG;

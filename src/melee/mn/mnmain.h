@@ -27,6 +27,8 @@ typedef struct _MainMenuData {
     /* 0x00BE */ u8 vita_options_page;
     /* 0x00BF */ u8 vita_control_capture_action;
 #endif
+    /* The 1P menu's Online Play label (Slippi Direct). */
+    HSD_Text* vita_online_label;
 #endif
 } MainMenuData;
 

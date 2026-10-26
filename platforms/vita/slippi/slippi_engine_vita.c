@@ -7,6 +7,7 @@
 #include <melee/slippi/slippi_platform.h>
 
 #include <psp2/kernel/threadmgr.h>
+#include <stdio.h>
 
 void mp_platform_slippi_log(const char* text)
 {
@@ -61,4 +62,34 @@ int mp_platform_slippi_net_ping_ms(void)
 int mp_platform_slippi_net_time_offset_us(void)
 {
     return slippi_net_time_offset_us();
+}
+
+/* 1 when MnMaAll.usd and SdMenu.usd are in ux0:data/melee/slippi/files/.
+ * dvd.c loads them in place of the disc's copies.  Checked once. */
+int mp_platform_slippi_menu_files(void)
+{
+    static int checked;
+    static int present;
+    char path[200];
+    FILE* file;
+
+    if (checked) return present;
+    checked = 1;
+    present = 1;
+    snprintf(path, sizeof(path), "%s/files/MnMaAll.usd", sp_data_dir());
+    file = fopen(path, "rb");
+    if (file == NULL) {
+        present = 0;
+    } else {
+        fclose(file);
+    }
+    snprintf(path, sizeof(path), "%s/files/SdMenu.usd", sp_data_dir());
+    file = fopen(path, "rb");
+    if (file == NULL) {
+        present = 0;
+    } else {
+        fclose(file);
+    }
+    sp_log("Slippi menu files %s", present ? "found" : "not found, vanilla menus");
+    return present;
 }

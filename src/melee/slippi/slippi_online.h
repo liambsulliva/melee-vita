@@ -46,6 +46,9 @@ int mp_slippi_sss_alt_mode(void);
 void mp_slippi_css_sheik(int sheik);
 void mp_slippi_css_hide_title(void);
 
+/* In mnmain.c: Slippi's Online submenu, when its menu files are there. */
+void mp_slippi_menu_prepare(void);
+
 /* ---- the overlay, slippi_online_hud.c ---- */
 /* Called from DevText_DrawAll (textdraw.c) on every screen. */
 void mp_slippi_online_draw_hud(void);
