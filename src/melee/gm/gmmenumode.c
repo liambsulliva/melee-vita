@@ -110,6 +110,11 @@ void onEnter(GameModeState* scene)
         previous_mode = gm_801737D8();
     }
     switch (previous_mode) {
+    case GM_HANYU_CSS:
+        /* Slippi Direct: back on Online Play. */
+        data->menu_kind = MENU_KIND_1P;
+        data->hovered_selection = SEL_1P_2;
+        return;
     case GM_CLASSIC:
         data->menu_kind = MENU_KIND_REG;
         data->hovered_selection = SEL_REG_CLASSIC;

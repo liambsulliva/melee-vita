@@ -230,5 +230,7 @@ int slippi_net_remote_checksum(int *unused);
 int slippi_net_remote_checksum_frame(void);
 unsigned slippi_net_remote_checksum_value(void);
 int slippi_net_ping_ms(void);
+int slippi_net_remote_character(void);
+int slippi_net_time_offset_us(void);
 
 #endif

@@ -89,7 +89,12 @@ void preloadState(GameModeState* state)
         HSD_SisLib_803A6048(0xC000);
         break;
     case GS_CSS:
-        HSD_SisLib_803A6048(0x2400);
+        /* Slippi Direct's CSS text needs twice the room. */
+        if (state_machine.routing.curr_mode == GM_HANYU_CSS) {
+            HSD_SisLib_803A6048(0x4800);
+        } else {
+            HSD_SisLib_803A6048(0x2400);
+        }
         break;
     default:
         HSD_SisLib_803A6048(0x4800);

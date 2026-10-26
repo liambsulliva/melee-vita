@@ -744,7 +744,13 @@ bool mn_80229938(MenuKind menu_kind, s32 selection)
 #endif
     }
     if (menu_kind == MENU_KIND_1P && selection == SEL_1P_2) {
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+        /* Slippi Direct: the hidden entry is Online Play.  The PS5 has no
+         * network client, so it stays hidden there. */
+        return true;
+#else
         return false;
+#endif
     }
     if (menu_kind == MENU_KIND_TOY) {
         switch (selection) {
@@ -3418,6 +3424,15 @@ void mn_8022D7F4(HSD_GObj* gp)
             sfxForward();
             mnEvent_8024E838(0, true);
             HSD_GObjFree(gp);
+            break;
+        case SEL_1P_2:
+            /* Slippi Direct (Slippi's OnlineModeOptionSelected).  Slippi
+             * opens its Online submenu first, and Direct is the only
+             * mode here, so this goes straight to it. */
+            sfxForward();
+            data = gm_GetCurrentSceneExitData();
+            data->pending_mode = GM_HANYU_CSS;
+            gm_801A4B60();
             break;
         case SEL_1P_TRAINING:
             sfxForward();

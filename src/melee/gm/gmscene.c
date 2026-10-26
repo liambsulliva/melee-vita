@@ -9,6 +9,7 @@
 #include "gmscdata.h"
 #include <dolphin/os/OSThread.h>
 #include <melee/db/db.h>
+#include <melee/slippi/slippi_online.h>
 #include <melee/if/ifcoget.h>
 #include <melee/lb/lb_013B.h>
 #include <melee/lb/lb_0195.h>
@@ -216,6 +217,12 @@ u32 gm_801A4BA8(void)
     return gm_80479D58.unk_0;
 }
 
+/* Slippi online play: nonzero while the scene loop is leaving. */
+int mp_slippi_engine_leaving(void)
+{
+    return gm_80479D58.unk_C;
+}
+
 u32 gm_801A4BB8(void)
 {
     return gm_80479D58.unk_8;
@@ -352,6 +359,9 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
             u64 vita_update_start_us = sceKernelGetProcessTimeWide();
 #endif
             HSD_PerfSetStartTime();
+            /* Slippi online play: trade pads with the opponent and
+             * check for a desync (StartEngineLoop). */
+            mp_slippi_online_frame_begin();
             lb_800198E0();
             if (DbLevel >= DbLKind_DebugRom) {
                 gm_801A4970(&temp_r25->unk_10.db_input);
@@ -415,6 +425,12 @@ void gm_801A4D34(void (*on_frame)(void), UNUSED GameSceneInfo* info)
             gmMainLib_8046B0F0.xC = false;
             if (temp_r25->unk_C != 0) {
                 break;
+            }
+            /* Slippi online play: the time sync, and what the drawing
+             * would have set up when no drawing follows this body. */
+            mp_slippi_online_frame_end();
+            if (i + 1 < pad_queue_count) {
+                mp_slippi_tick_without_draw();
             }
         }
         if (!traced_update) {

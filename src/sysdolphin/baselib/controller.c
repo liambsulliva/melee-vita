@@ -63,6 +63,14 @@ void HSD_PadRenewRawStatus(bool err_check)
 
     HSD_PadRumbleInterpret();
     PADRead(now);
+    {
+        /* Slippi online play: the time sync can drop this sample
+         * (src/melee/slippi/slippi_online.c). */
+        extern int mp_slippi_online_pad_renew(PADStatus* pad);
+        if (mp_slippi_online_pad_renew(now)) {
+            return;
+        }
+    }
     if (err_check) {
         for (i = 0; i < 4; i++) {
             if (!now[i].err) {

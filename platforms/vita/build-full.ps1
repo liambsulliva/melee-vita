@@ -368,13 +368,15 @@ $slippiSources = @(
     'platforms/vita/slippi/slippi_bridge.c',
     'platforms/vita/slippi/slippi_config.c',
     'platforms/vita/slippi/slippi_directtest_vita.c',
+    'platforms/vita/slippi/slippi_engine_vita.c',
     'platforms/vita/slippi/slippi_json.c',
     'platforms/vita/slippi/slippi_mm.c',
     'platforms/vita/slippi/slippi_net.c',
     'platforms/vita/slippi/slippi_netcheck_vita.c',
     'platforms/vita/slippi/slippi_p2p.c',
     'platforms/vita/slippi/slippi_plat_vita.c',
-    'platforms/vita/slippi/slippi_selftest.c'
+    'platforms/vita/slippi/slippi_selftest.c',
+    'platforms/vita/slippi/slippi_ui.c'
 )
 $platformSources += $slippiSources
 # Exact maths (platforms/vita/fp): the console's sqrtf, fma, frsqrte, fres

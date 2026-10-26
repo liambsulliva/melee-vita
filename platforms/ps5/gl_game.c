@@ -1217,7 +1217,8 @@ void melee_vita_gxm_queue_overlay_full_width(vita2d_texture* texture, u32 width,
     queue_overlay(texture, width, height, true);
 }
 
-/* Only the Vita's Slippi replay test uses the screen overlay so far. */
+/* Only the Vita's Slippi replay test and online overlay use the screen
+ * overlay so far. */
 void melee_vita_gxm_set_screen_overlay(
     const MeleeVitaScreenVertex* triangles, u32 triangle_vertex_count,
     const MeleeVitaScreenVertex* lines, u32 line_vertex_count)
@@ -1226,6 +1227,66 @@ void melee_vita_gxm_set_screen_overlay(
     (void) triangle_vertex_count;
     (void) lines;
     (void) line_vertex_count;
+}
+
+/* Slippi Direct (src/melee/slippi/slippi_platform.h).  The PS5 has no
+ * network client, so online play stays off: the connection is always idle
+ * and the online CSS never starts a match. */
+void mp_platform_slippi_log(const char* text) { (void) text; }
+void mp_platform_slippi_idle(void) {}
+int mp_platform_slippi_net_status(void) { return 0; }
+void mp_platform_slippi_net_poll(void) {}
+int mp_platform_slippi_net_match_block(unsigned char* out)
+{
+    (void) out;
+    return 0;
+}
+int mp_platform_slippi_net_send_inputs(int frame, int delay, int finalized_frame,
+                                       unsigned checksum, const unsigned char* local_pad,
+                                       unsigned char* remote_pad)
+{
+    (void) frame;
+    (void) delay;
+    (void) finalized_frame;
+    (void) checksum;
+    (void) local_pad;
+    (void) remote_pad;
+    /* Disconnected. */
+    return 3;
+}
+int mp_platform_slippi_net_remote_checksum_frame(void) { return 0; }
+unsigned mp_platform_slippi_net_remote_checksum_value(void) { return 0; }
+int mp_platform_slippi_net_ping_ms(void) { return 0; }
+int mp_platform_slippi_net_time_offset_us(void) { return 0; }
+int mp_platform_slippi_ui_css(int packed, int trigger, int held)
+{
+    (void) packed;
+    (void) trigger;
+    (void) held;
+    return 0;
+}
+void mp_platform_slippi_ui_event(int event, int arg)
+{
+    (void) event;
+    (void) arg;
+}
+int mp_platform_slippi_ui_remote(void) { return -1; }
+int mp_platform_slippi_ui_text(int line, char* out, int len)
+{
+    (void) line;
+    if (len > 0) out[0] = '\0';
+    return 0;
+}
+int mp_platform_slippi_ui_name(int local, char* out, int len)
+{
+    (void) local;
+    if (len > 0) out[0] = '\0';
+    return 0;
+}
+int mp_platform_slippi_ui_alt(int toggle)
+{
+    (void) toggle;
+    return 0;
 }
 
 /* ===================================================================

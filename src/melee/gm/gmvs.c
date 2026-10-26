@@ -1,6 +1,7 @@
 #include <melee/slippi/slippi_rules.h>
 #include "gmvs.h"
 #include <melee/slippi/slippi_replay.h>
+#include <melee/slippi/slippi_online.h>
 
 #include <Runtime/platform.h>
 
@@ -2046,6 +2047,7 @@ void fn_8016E730(StartMeleeData* arg0)
     mp_slippi_rules_match_start();
     db_Setup();
     mp_slippi_replay_start_melee(arg0);
+    mp_slippi_online_start_melee(arg0);
     gm_SetDbPauseInputHandlers(gm_AnyControllerPressedStart,
                                gm_AnyControllerPressedZ);
     gm_SetPreGObjProcCallback(db_RunEveryFrame);
@@ -2137,6 +2139,16 @@ static inline bool gm_8016E9C8_inline(void)
     }
 }
 
+/* Slippi online play: ends the match as a no contest, the way Slippi's
+ * FN_END_GAME does after a disconnect or a desync. */
+void mp_slippi_gmvs_end_online(int pauser)
+{
+    controller.state.pauser = (s8) pauser;
+    controller.state.match_result = 7;
+    /* Slippi shortens the GAME! screen from 110 frames. */
+    controller.start.xD = 90;
+}
+
 void gm_Scene_Vs_OnExit(void* user_data)
 {
     struct EndMeleeData* data = user_data;
@@ -2144,6 +2156,7 @@ void gm_Scene_Vs_OnExit(void* user_data)
     int i;
 
     mp_slippi_replay_match_exit();
+    mp_slippi_online_match_exit();
     if (controller.state.match_over == 0) {
         data->xC = controller.state.x24C;
         data->xC.is_teams = controller.start.is_teams;

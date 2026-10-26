@@ -2066,6 +2066,11 @@ static void exec_present_impl(const void* payload)
         melee_vita_updater_render_dialog();
     }
 #endif
+    {
+        /* Slippi Direct's connect code keyboard (slippi/slippi_ui.c). */
+        extern void melee_vita_slippi_render_dialog(void);
+        melee_vita_slippi_render_dialog();
+    }
 #if defined(MELEE_VITA_PROFILER) && defined(MELEE_VITA_PROFILE_GPU_FINISH)
     {
         /* Diagnostic only: serializes CPU and GPU to measure how long the
