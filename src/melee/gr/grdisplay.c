@@ -69,7 +69,35 @@ void grDisplay_801C5B90(HSD_JObj* jobj, Mtx vmtx, u32 flags, u32 rendermode)
     }
 }
 
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+/* Benchmark profile: stage drawing split by stage part (map gobj index), to
+ * see which part of a stage is expensive. Only while the benchmark records.
+ * Potato mode also skips parts here (gfx_settings.c). */
+static void grDisplay_801C5DB0_impl(HSD_GObj* gobj, int code);
 void grDisplay_801C5DB0(HSD_GObj* gobj, int code)
+{
+    extern int g_melee_vita_bench_prof;
+    extern u32 g_melee_vita_gx_counts[5];
+    extern u64 sceKernelGetProcessTimeWide(void);
+    extern void melee_vita_bench_stage_part(int part, u64 us, u32 draws);
+    extern int melee_vita_stage_part_hidden(int part);
+    // potato mode (graphics settings): some decorative parts aren't drawn
+    if (melee_vita_stage_part_hidden((int) GET_GROUND(gobj)->map_id)) return;
+    if (g_melee_vita_bench_prof) {
+        u32 d0 = g_melee_vita_gx_counts[0] + g_melee_vita_gx_counts[1];
+        u64 t0 = sceKernelGetProcessTimeWide();
+        grDisplay_801C5DB0_impl(gobj, code);
+        melee_vita_bench_stage_part((int) GET_GROUND(gobj)->map_id,
+                                    sceKernelGetProcessTimeWide() - t0,
+                                    g_melee_vita_gx_counts[0] + g_melee_vita_gx_counts[1] - d0);
+    } else {
+        grDisplay_801C5DB0_impl(gobj, code);
+    }
+}
+static void grDisplay_801C5DB0_impl(HSD_GObj* gobj, int code)
+#else
+void grDisplay_801C5DB0(HSD_GObj* gobj, int code)
+#endif
 {
     Ground* gp;
     HSD_GObj* camgobj;

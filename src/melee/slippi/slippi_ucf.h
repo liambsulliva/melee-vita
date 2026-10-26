@@ -1,7 +1,14 @@
 #ifndef MP_UCF_H
 #define MP_UCF_H
 #include <melee/ft/forward.h>
-#ifdef MELEE_VITA_SLIPPI
+/* UCF is in every Vita build.  The Settings screen's UCF option
+ * (g_melee_vita_ucf, gfx_settings.c) turns it on offline, and Slippi's rules
+ * decide in the replay test and online matches. */
+#if defined(MELEE_VITA_SLIPPI) || (defined(TARGET_VITA) && !defined(TARGET_PS5))
+#define MELEE_VITA_UCF 1
+#endif
+#ifdef MELEE_VITA_UCF
+extern int g_melee_vita_ucf;
 void mp_ucf_reset(void);
 /* Which UCF runs: 84 for UCF 0.84 (what Slippi runs now, and the default),
  * 80 for UCF 0.8 (what Slippi 3.14 ran, for its replays), 0 for none. */
@@ -16,7 +23,7 @@ int mp_ucf_drop_extended(Fighter*);
 int mp_ucf_suppress_spotdodge(Fighter*);
 float mp_ucf_squat_threshold(Fighter*);
 #else
-/* Builds without -EnableSlippi: no UCF, the game's own stick handling. */
+/* The PS5: no UCF, the game's own stick handling. */
 static inline void mp_ucf_reset(void) {}
 static inline void mp_ucf_set_version(int version) { (void) version; }
 static inline int mp_ucf_version(void) { return 0; }

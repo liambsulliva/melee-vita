@@ -1,10 +1,10 @@
 /* UCF 0.84 as Slippi runs it (part of its General Codes), and UCF 0.8 for
  * older replays.  Copied from the 3DS Slippi port (melee-3ds
- * slippi-beta-v0.1.0, native-3ds/port/engine/ucf.c).  Gated by the Slippi
- * rules (slippi_rules.h), so it only runs in the replay test and online
- * matches. */
-#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
+ * slippi-beta-v0.1.0, native-3ds/port/engine/ucf.c).  The Slippi rules
+ * (slippi_rules.h) turn it on in the replay test and online matches, and
+ * the Settings screen's UCF option turns it on offline. */
 #include "slippi_ucf.h"
+#ifdef MELEE_VITA_UCF /* every Vita build, see slippi_ucf.h */
 #include "slippi_ucf_math.h"
 #include <string.h>
 #include <melee/ft/types.h>
@@ -23,10 +23,20 @@ static MPUcfPad pads[4];
  * recorded raw sticks here too. */
 PADStatus mp_pad_consumed[4];
 volatile unsigned mp_ucf_enabled=1;
+/* The Settings screen's UCF option (gfx_settings.c). */
+int g_melee_vita_ucf;
 unsigned mp_ucf_checks[8],mp_ucf_applied[8];
 void mp_ucf_reset(void){memset(pads,0,sizeof(pads));}
 /* UCF 0.84 is part of Slippi's General Codes (mp_slippi_rules_mask bit MP_SR_UCF). */
-static int active(Fighter*f){return mp_ucf_enabled&&mp_slippi_rule(MP_SR_UCF)&&f->x618_player_id<4;}
+/* While Slippi's rules are on (the replay test, online matches) they decide,
+ * so a match always runs what Slippi runs.  Otherwise the Settings option
+ * does. */
+static int active(Fighter* f)
+{
+    if (!mp_ucf_enabled || f->x618_player_id >= 4) return 0;
+    if (mp_slippi_rules_enabled) return mp_slippi_rule(MP_SR_UCF);
+    return g_melee_vita_ucf;
+}
 
 /* UCF 0.8, for replays from Slippi 3.14 (tools/slippi/vita_replay_pack.py
  * reads which one a replay ran from its code list).  It has only dashback,
@@ -184,4 +194,4 @@ float mp_ucf_squat_threshold(Fighter*f){
 /* Slippi experiment diagnostics: the UCF stick history (replay fighter dumps). */
 const void* mp_ucf_history(unsigned* size){*size=sizeof(pads);return pads;}
 
-#endif /* MELEE_VITA_SLIPPI */
+#endif /* MELEE_VITA_UCF */

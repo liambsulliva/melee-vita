@@ -2101,10 +2101,30 @@ void fn_8016E730(StartMeleeData* arg0)
     }
 }
 
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+/* Graphics settings: AUTO frame rate picks 30 or 60 for the whole match
+ * (platforms/vita/game/gfx_settings.c). */
+extern void melee_vita_match_begin(int players, int stage_kind);
+extern void melee_vita_match_end(void);
+static void vita_match_begin(StartMeleeData* md)
+{
+    int i, n = 0;
+    for (i = 0; i < 4; i++)
+        if (md->players[i].slot_type != Gm_PKind_NA) n++;
+    melee_vita_match_begin(n, md->rules.stkind);
+}
+#endif
+
 void gm_Scene_Vs_OnEnter(void* arg0)
 {
     StartMeleeData* tmp = arg0;
     fn_8016E730(tmp);
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+    /* After fn_8016E730: in a Slippi online match it replaces the stage
+     * and players with the ones both games agreed on.  Everything this
+     * sets is only read when drawing, so offline VS works the same. */
+    vita_match_begin(tmp);
+#endif
     if (tmp->rules.x1_2) {
         ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
     } else {
@@ -2159,6 +2179,9 @@ void gm_Scene_Vs_OnExit(void* user_data)
 
     mp_slippi_replay_match_exit();
     mp_slippi_online_match_exit();
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+    melee_vita_match_end();
+#endif
     if (controller.state.match_over == 0) {
         data->xC = controller.state.x24C;
         data->xC.is_teams = controller.start.is_teams;
@@ -2201,6 +2224,9 @@ void gm_Scene_Vs_OnExit(void* user_data)
 void gm_Scene_SuddenDeath_OnEnter(void* user_data)
 {
     StartMeleeData* data = user_data;
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+    vita_match_begin(data);
+#endif
     data->rules.x6 = true;
     fn_8016E730(data);
     ifStatus_802F6EA4(1, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
@@ -2213,6 +2239,9 @@ void gm_Scene_Training_OnEnter(void* user_data)
     StartMeleeData* data = user_data;
     struct VsSceneController* tmp2;
 
+#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+    vita_match_begin(data);
+#endif
     fn_8016E730(data);
     Ground_801C1154();
     grStadium_801D410C();

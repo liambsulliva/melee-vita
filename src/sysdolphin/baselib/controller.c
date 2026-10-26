@@ -373,9 +373,9 @@ void HSD_PadRenewMasterStatus(void)
     intr = OSDisableInterrupts();
     if (p->qcount != 0) {
         qread = &p->queue->stat[p->qread * 4];
-#ifdef MELEE_VITA_SLIPPI
+#if defined(MELEE_VITA_SLIPPI) || (defined(TARGET_VITA) && !defined(TARGET_PS5))
         {
-            /* Slippi UCF reads the raw sticks this frame used. */
+            /* UCF (slippi_ucf.c) reads the raw sticks this frame used. */
             extern PADStatus mp_pad_consumed[4];
             int k;
             for (k = 0; k < 4; k++) {
