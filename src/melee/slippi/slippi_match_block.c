@@ -8,6 +8,7 @@
  * timer and players when a match starts (slippi_replay.c), and a real
  * Slippi 3.14 block (Fox vs Falco on Final Destination) decoded to the
  * values Slippi Launcher shows for it. */
+#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
 #include "slippi_match_block.h"
 
 #include <stddef.h>
@@ -184,3 +185,5 @@ void mp_slippi_decode_match_block(const u8* block, StartMeleeData* out)
         decode_player(block + 0x60 + i * 0x24, &out->players[i]);
     }
 }
+
+#endif /* MELEE_VITA_SLIPPI */

@@ -3,6 +3,7 @@
  * slippi-beta-v0.1.0, native-3ds/port/engine/ucf.c).  Gated by the Slippi
  * rules (slippi_rules.h), so it only runs in the replay test and online
  * matches. */
+#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
 #include "slippi_ucf.h"
 #include "slippi_ucf_math.h"
 #include <string.h>
@@ -182,3 +183,5 @@ float mp_ucf_squat_threshold(Fighter*f){
 }
 /* Slippi experiment diagnostics: the UCF stick history (replay fighter dumps). */
 const void* mp_ucf_history(unsigned* size){*size=sizeof(pads);return pads;}
+
+#endif /* MELEE_VITA_SLIPPI */

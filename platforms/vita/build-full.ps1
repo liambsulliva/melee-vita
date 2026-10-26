@@ -37,13 +37,19 @@ param(
     [switch]$EnableUpdater,
     [ValidatePattern('^[0-9A-Fa-f]{64}$')]
     [string]$UpdaterPublicKeyHex,
-    # Slippi Direct play: GameCube-exact floating point.  Needs a host C++
-    # compiler and the GMP headers to build tools/gcc_fp_contract.
-    [switch]$EnableExactMath,
+    # Slippi Direct play: online play, the replay test, Slippi's gameplay
+    # codes and UCF, ENet and the network client, and the GameCube-exact
+    # floating point they need.  Exact maths needs a host C++ compiler and
+    # the GMP headers to build tools/gcc_fp_contract.  Without this switch
+    # none of it is compiled in.
+    [switch]$EnableSlippi,
     [string]$HostCxx = $(if ($env:CXX) { $env:CXX } else { 'g++' })
 )
 
 $ErrorActionPreference = 'Stop'
+# Online play only works when both games simulate bit for bit, so Slippi
+# builds always use exact maths.
+$EnableExactMath = $EnableSlippi.IsPresent
 if (-not $VitaSdk) {
     throw 'VITASDK is not set. Pass -VitaSdk or set the VITASDK environment variable.'
 }
@@ -283,7 +289,7 @@ function Invoke-VitaTool([string]$Name, [string[]]$Arguments) {
 $fpContractPlugin = $null
 if ($EnableExactMath) {
     if ($IsWindows) {
-        throw '-EnableExactMath needs a Linux or macOS VitaSDK: the Windows build of GCC cannot load plugins. Use WSL or the CI build.'
+        throw '-EnableSlippi needs a Linux or macOS VitaSDK: the Windows build of GCC cannot load plugins. Use WSL or the CI build.'
     }
     $pluginSource = Join-Path $root 'tools/gcc_fp_contract/fp_contract_plugin.cc'
     $fpContractPlugin = Join-Path $build 'fp_contract_plugin.so'
@@ -314,6 +320,7 @@ $gameArchive = & (Join-Path $PSScriptRoot 'build-game.ps1') `
     -EnableRenderTrace:$EnableRenderTrace `
     -EnableRuntimeResolutionMenu:$EnableRuntimeResolutionMenu `
     -EnableExactMath:$EnableExactMath `
+    -EnableSlippi:$EnableSlippi `
     -FpContractPlugin $fpContractPlugin `
     -VitaReleaseVersion $version.release `
     -VitaBuildNumber $VitaBuildNumber |
@@ -351,11 +358,16 @@ $platformSources = @(
     'platforms/vita/game/profiler_live.c',
     'platforms/vita/game/thp.c',
     'platforms/vita/game/vi.c',
-    'platforms/vita/game/vita_net.c',
     'platforms/vita/game/widescreen.c'
 )
+# Shared SceNet start and stop, for Slippi and the updater.
+if ($EnableSlippi -or $EnableUpdater) {
+    $platformSources += 'platforms/vita/game/vita_net.c'
+}
 # Slippi Direct play: ENet and the network client from the 3DS port
 # (platforms/vita/slippi), plus the Vita platform layer for it.
+$slippiSources = @()
+if ($EnableSlippi) {
 $slippiSources = @(
     'platforms/vita/slippi/enet/callbacks.c',
     'platforms/vita/slippi/enet/compress.c',
@@ -378,6 +390,7 @@ $slippiSources = @(
     'platforms/vita/slippi/slippi_selftest.c',
     'platforms/vita/slippi/slippi_ui.c'
 )
+}
 $platformSources += $slippiSources
 # Exact maths (platforms/vita/fp): the console's sqrtf, fma, frsqrte, fres
 # and paired-single matrix routines, plus the boot check.
@@ -468,8 +481,10 @@ if ($EnableLiveProfiler) {
     }
 }
 $common += '-DMELEE_VITA_GPU_BUMP_DL=1'
-if ($EnableExactMath) {
-    # main.c runs platforms/vita/fp/fp_check.c at boot.
+if ($EnableSlippi) {
+    # The Slippi hooks in the platform code (pad.c, dvd.c, gxm_game.c,
+    # main.c).  main.c also runs platforms/vita/fp/fp_check.c at boot.
+    $common += '-DMELEE_VITA_SLIPPI=1'
     $common += '-DMELEE_VITA_EXACT_MATH_CHECK=1'
 }
 if ($UseCpuVertexPath) {
@@ -582,9 +597,11 @@ if ($EnableLiveProfiler) {
     $link += @($ProfilerLibrary, '-lSceNet_stub', '-lSceNetCtl_stub',
                '-lSceNetPs_stub')
 }
+if ($EnableSlippi) {
+    # Slippi Direct play's sockets, in Release builds too.
+    $link += @('-lSceNet_stub', '-lSceNetCtl_stub')
+}
 $link += @(
-    # Slippi Direct play needs sockets in every build, not only Debug.
-    '-lSceNet_stub', '-lSceNetCtl_stub',
     '-lSceCtrl_stub', '-lSceDisplay_stub', '-lSceAudio_stub', '-lSceJpeg_stub', '-lSceKernelThreadMgr_stub',
     '-lvita2d', '-lSceGxm_stub', '-lSceDisplay_stub', '-lSceAppMgr_stub',
     '-lSceTouch_stub',

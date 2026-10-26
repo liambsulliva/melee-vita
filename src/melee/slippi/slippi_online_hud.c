@@ -12,6 +12,7 @@
  *
  * Positions are Slippi's, in the HUD's 640 x 480 space with the centre at
  * 0, 0 and y going down, then scaled to the display's 544 lines. */
+#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
 #include "slippi_online.h"
 
 #include "slippi_platform.h"
@@ -208,3 +209,5 @@ void mp_slippi_online_draw_hud(void)
 
     melee_vita_gxm_set_screen_overlay(s_triangles, s_triangle_count, s_lines, s_line_count);
 }
+
+#endif /* MELEE_VITA_SLIPPI */

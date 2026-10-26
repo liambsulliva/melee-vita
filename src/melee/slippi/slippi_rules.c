@@ -22,6 +22,7 @@
  * contraction plugin leaves their arithmetic alone, like the 3DS compiles
  * its port code with -ffp-contract=off.
  */
+#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
 #include <string.h>
 #include <melee/ft/fighter.h>
 #include <melee/ft/ftcommon.h>
@@ -491,3 +492,5 @@ int mp_slippi_lgl_timeout_message(void)
     ((u8*) gm_GetStartMeleeRules())[0xD] = 0xFD;   /* GAME! hold time */
     return online_local_player == loser ? 6 : 2;
 }
+
+#endif /* MELEE_VITA_SLIPPI */

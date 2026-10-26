@@ -217,11 +217,13 @@ u32 gm_801A4BA8(void)
     return gm_80479D58.unk_0;
 }
 
+#ifdef MELEE_VITA_SLIPPI
 /* Slippi online play: nonzero while the scene loop is leaving. */
 int mp_slippi_engine_leaving(void)
 {
     return gm_80479D58.unk_C;
 }
+#endif
 
 u32 gm_801A4BB8(void)
 {

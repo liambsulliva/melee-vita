@@ -2,8 +2,10 @@
 #include "vita_platform.h"
 #include "profiler_live.h"
 #include "../vita_log.h"
+#ifdef MELEE_VITA_SLIPPI
 #include "../slippi/slippi_directtest_vita.h"
 #include "../slippi/slippi_netcheck_vita.h"
+#endif
 #ifdef MELEE_VITA_UPDATER
 #include "../updater/update_runtime.h"
 #endif
@@ -56,11 +58,13 @@ int main(void)
     }
 #endif
 
+#ifdef MELEE_VITA_SLIPPI
     /* Slippi bring-up: these only run when netcheck.txt or directtest.txt
      * is on the memory card.
      * It goes before the updater so the two don't share the network yet. */
     melee_vita_slippi_netcheck();
     melee_vita_slippi_directtest();
+#endif
 #ifdef MELEE_VITA_EXACT_MATH_CHECK
     /* Exact-maths builds log the FPSCR and check the console maths
      * (platforms/vita/fp/fp_check.c) into slippi.log. */

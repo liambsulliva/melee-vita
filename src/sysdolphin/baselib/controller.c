@@ -63,6 +63,7 @@ void HSD_PadRenewRawStatus(bool err_check)
 
     HSD_PadRumbleInterpret();
     PADRead(now);
+#ifdef MELEE_VITA_SLIPPI
     {
         /* Slippi online play: the time sync can drop this sample
          * (src/melee/slippi/slippi_online.c). */
@@ -71,6 +72,7 @@ void HSD_PadRenewRawStatus(bool err_check)
             return;
         }
     }
+#endif
     if (err_check) {
         for (i = 0; i < 4; i++) {
             if (!now[i].err) {
@@ -371,6 +373,7 @@ void HSD_PadRenewMasterStatus(void)
     intr = OSDisableInterrupts();
     if (p->qcount != 0) {
         qread = &p->queue->stat[p->qread * 4];
+#ifdef MELEE_VITA_SLIPPI
         {
             /* Slippi UCF reads the raw sticks this frame used. */
             extern PADStatus mp_pad_consumed[4];
@@ -379,6 +382,7 @@ void HSD_PadRenewMasterStatus(void)
                 mp_pad_consumed[k] = qread[k];
             }
         }
+#endif
         HSD_PadRawQueueShift(p->qnum, &p->qread);
         p->qcount -= 1;
 

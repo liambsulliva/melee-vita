@@ -9,11 +9,13 @@
 #ifndef MP_SLIPPI_RULES_H
 #define MP_SLIPPI_RULES_H
 
+#ifdef MELEE_VITA_SLIPPI
 /* Master switch (default 0 on the Vita, so offline play stays vanilla) and
  * one bit per code (default all set), so a code can be compared with and
  * without. Poke them from a debugger. */
 extern volatile unsigned mp_slippi_rules_enabled;
 extern volatile unsigned mp_slippi_rules_mask;
+#endif
 
 #define MP_SR_UCF            (1u << 0)  /* UCF 0.84 (port/engine/ucf.c) */
 #define MP_SR_NEUTRAL_SPAWN  (1u << 1)
@@ -34,6 +36,7 @@ extern volatile unsigned mp_slippi_rules_mask;
 #define MP_SR_LGL            (1u << 16) /* LGLExceededGameEnd (online only) */
 #define MP_SR_ONLINE_INIT    (1u << 17) /* InitOnlinePlay's held-A clear */
 
+#ifdef MELEE_VITA_SLIPPI
 static inline int mp_slippi_rule(unsigned bit)
 {
     return mp_slippi_rules_enabled && (mp_slippi_rules_mask & bit) != 0;
@@ -72,5 +75,67 @@ int mp_slippi_ps_archive_valid(void);
 void mp_slippi_dynamics_fix(struct Fighter* fp);
 int mp_slippi_lgl_timeout_message(void);
 void mp_slippi_clear_image(void* image_desc);
+
+#else
+/* Builds without -EnableSlippi: every code is off and each hook does what
+ * the game did before, so the calls in the game code compile away. */
+struct Fighter;
+struct HSD_GObj;
+#define mp_slippi_rules_enabled 0
+static inline int mp_slippi_rule(unsigned bit)
+{
+    (void) bit;
+    return 0;
+}
+static inline void mp_slippi_rules_set_enabled(int enabled) { (void) enabled; }
+static inline void mp_slippi_rules_set_frozen_stadium(int frozen) { (void) frozen; }
+static inline int mp_slippi_rules_frozen_stadium(void) { return 0; }
+static inline void mp_slippi_rules_set_frozen_fd(int frozen) { (void) frozen; }
+static inline int mp_slippi_rules_frozen_fd(void) { return 0; }
+static inline void mp_slippi_rules_set_online(int mode, int local_player)
+{
+    (void) mode;
+    (void) local_player;
+}
+static inline void mp_slippi_rules_match_start(void) {}
+static inline void mp_slippi_neutral_spawn(int slot, int is_teams)
+{
+    (void) slot;
+    (void) is_teams;
+}
+static inline int mp_slippi_offscreen_zone(struct Fighter* fp)
+{
+    (void) fp;
+    return 0;
+}
+static inline void mp_slippi_wobble_reset(struct Fighter* fp) { (void) fp; }
+static inline int mp_slippi_wobble_check(struct HSD_GObj* gobj)
+{
+    (void) gobj;
+    return 0;
+}
+static inline void mp_slippi_dead_up_init(struct Fighter* fp, float vel_y, float vel_z)
+{
+    (void) fp;
+    (void) vel_y;
+    (void) vel_z;
+}
+static inline void mp_slippi_dead_up_fall(struct Fighter* fp, float gravity, float terminal)
+{
+    (void) fp;
+    (void) gravity;
+    (void) terminal;
+}
+/* The vanilla monitor test decides. */
+static inline int mp_slippi_ps_monitor_ok(int slot, int vanilla)
+{
+    (void) slot;
+    return vanilla;
+}
+static inline int mp_slippi_ps_archive_valid(void) { return 0; }
+static inline void mp_slippi_dynamics_fix(struct Fighter* fp) { (void) fp; }
+static inline int mp_slippi_lgl_timeout_message(void) { return 0; }
+static inline void mp_slippi_clear_image(void* image_desc) { (void) image_desc; }
+#endif
 
 #endif

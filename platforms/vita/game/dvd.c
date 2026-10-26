@@ -30,10 +30,10 @@
 #define VITA_DVD_OVERLAY_BASE 0x80000000u
 #define VITA_DVD_OVERLAY_SHIFT 24u
 #define VITA_DVD_OVERLAY_OFFSET_MASK 0x00FFFFFFu
-#ifdef TARGET_PS5
-#define VITA_DVD_OVERLAY_COUNT 5u
-#else
+#ifdef MELEE_VITA_SLIPPI
 #define VITA_DVD_OVERLAY_COUNT 10u
+#else
+#define VITA_DVD_OVERLAY_COUNT 5u
 #endif
 #define VITA_DVD_COSTUME_DIR "ux0:data/melee/costumes/"
 #define VITA_DVD_SLIPPI_DIR "ux0:data/melee/slippi/files/"
@@ -53,7 +53,7 @@ static VitaDvdOverlay s_overlays[VITA_DVD_OVERLAY_COUNT] = {
     { "PlGkBk.dat", VITA_DVD_COSTUME_DIR, TRUE, NULL, -1, 0 },
     { "PlGkYe.dat", VITA_DVD_COSTUME_DIR, TRUE, NULL, -1, 0 },
     { "PlGkWh.dat", VITA_DVD_COSTUME_DIR, TRUE, NULL, -1, 0 },
-#ifndef TARGET_PS5
+#ifdef MELEE_VITA_SLIPPI
     /* Slippi Direct's menus: Online Play, its descriptions, the stage
      * select, character select text and name entry. */
     { "MnMaAll.usd", VITA_DVD_SLIPPI_DIR, FALSE, NULL, -1, 0 },

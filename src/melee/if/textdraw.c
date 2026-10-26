@@ -10,6 +10,8 @@
 #ifdef TARGET_VITA
 #include <gxm_game.h>
 #include <melee/mn/mnvitadebug.h>
+#endif
+#ifdef MELEE_VITA_SLIPPI
 #include <melee/slippi/slippi_online.h>
 #include <melee/slippi/slippi_replay.h>
 #endif
@@ -312,7 +314,7 @@ void DevText_DrawAll(HSD_GObj* gobj, int pass)
             }
         }
 #endif
-#ifdef TARGET_VITA
+#ifdef MELEE_VITA_SLIPPI
         /* The Slippi replay test's progress panel.  The renderer draws it
          * over the finished frame, without GX. */
         mp_slippi_replay_draw_panel();

@@ -28,6 +28,7 @@
  * is logged as a new one, so one run shows more than the first problem.
  *
  * Without a replay file every function here returns straight away. */
+#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
 #include "slippi_replay.h"
 
 #include "slippi_match_block.h"
@@ -1042,3 +1043,5 @@ void mp_slippi_replay_match_exit(void)
     s_finished = 1;
     log_summary(s_terminated ? "replay finished" : "match ended early");
 }
+
+#endif /* MELEE_VITA_SLIPPI */

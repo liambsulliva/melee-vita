@@ -184,7 +184,7 @@ f32 DrawASCII(int chr, float x, float y, GXColor* color)
     return lbl_804D6070;
 }
 
-#ifdef TARGET_VITA
+#ifdef MELEE_VITA_SLIPPI
 /* The strokes of one debug font character, for code that draws the font
  * without GX.  The same table and character mapping as DrawASCII: pairs of
  * packed points (x in the high nibble, y in the low one, each step 0.11 of

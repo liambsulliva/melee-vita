@@ -1,6 +1,8 @@
 #include "mnmain.h"
+#ifdef MELEE_VITA_SLIPPI
 #include <melee/slippi/slippi_online.h>
 #include <melee/slippi/slippi_platform.h>
+#endif
 
 #include <melee/gm/forward.h>
 
@@ -721,7 +723,7 @@ void mn_80229894(s32 arg0, u16 arg1, s32 arg2)
     }
 }
 
-#if defined(TARGET_VITA) && !defined(TARGET_PS5)
+#ifdef MELEE_VITA_SLIPPI
 /* Slippi Direct: Slippi's Online submenu (OnMenuPrep.asm and
  * FN_OnlineSubmenuThink in slippi-ssbm-asm).  Menu kind 8 is unused in
  * vanilla.  Slippi's MnMaAll has the online options there (Ranked,
@@ -783,8 +785,6 @@ static void mn_SlippiOnlineMenuThink(HSD_GObj* gp)
         }
     }
 }
-#else
-void mp_slippi_menu_prepare(void) {}
 #endif
 
 /// @brief checks if a menu selection is locked
@@ -812,18 +812,19 @@ bool mn_80229938(MenuKind menu_kind, s32 selection)
 #endif
     }
     if (menu_kind == MENU_KIND_1P && selection == SEL_1P_2) {
-#if defined(TARGET_VITA) && !defined(TARGET_PS5)
-        /* Slippi Direct: the hidden entry is Online Play.  The PS5 has no
-         * network client, so it stays hidden there. */
+#ifdef MELEE_VITA_SLIPPI
+        /* Slippi Direct: the hidden entry is Online Play. */
         return true;
 #else
         return false;
 #endif
     }
+#ifdef MELEE_VITA_SLIPPI
     if (menu_kind == 8) {
         /* Slippi's Online submenu: only Direct. */
         return selection == 2;
     }
+#endif
     if (menu_kind == MENU_KIND_TOY) {
         switch (selection) {
         case SEL_TOY_2:
@@ -887,12 +888,12 @@ static void mn_VitaCreateDebugLabel(MainMenuData* data)
     data->vita_debug_label = label;
 }
 
+#ifdef MELEE_VITA_SLIPPI
 /* Slippi Direct: the 1P menu's third entry has no label art in the
  * vanilla menu file (Slippi patches its own in), so it gets a text label
  * like the Vita's own Settings entries. */
 static void mn_VitaCreateOnlineLabel(MainMenuData* data)
 {
-#ifndef TARGET_PS5
     static Vec3 const origin = { 0.0f, 0.0f, 0.0f };
     Vec3 position;
     HSD_Text* label;
@@ -925,10 +926,8 @@ static void mn_VitaCreateOnlineLabel(MainMenuData* data)
     }
     HSD_SisLib_803A6B98(label, 0.0f, 0.0f, "Online Play");
     data->vita_online_label = label;
-#else
-    (void) data;
-#endif
 }
+#endif
 
 #ifdef MELEE_VITA_RUNTIME_RESOLUTION_MENU
 enum {
@@ -1610,7 +1609,7 @@ static void mn_80229A7C(MainMenuData* data, MenuKind menu_kind, int selection)
                 "Session-only developer tools. Unsafe operations are disabled.");
             return;
         }
-#ifndef TARGET_PS5
+#ifdef MELEE_VITA_SLIPPI
         if (menu_kind == MENU_KIND_1P && selection == SEL_1P_2 &&
             !mp_platform_slippi_menu_files())
         {
@@ -2230,7 +2229,9 @@ void fn_8022AFEC(HSD_GObj* gp)
 #ifdef TARGET_VITA
     if (final_data->state == MENU_STATE_IDLE) {
         mn_VitaCreateDebugLabel(final_data);
+#ifdef MELEE_VITA_SLIPPI
         mn_VitaCreateOnlineLabel(final_data);
+#endif
 #ifdef MELEE_VITA_RUNTIME_RESOLUTION_MENU
         mn_VitaCreateOptionsLabel(final_data);
 #endif
@@ -2244,6 +2245,7 @@ void fn_8022AFEC(HSD_GObj* gp)
         final_data->vita_debug_label->hidden =
             final_data->state != MENU_STATE_IDLE;
     }
+#ifdef MELEE_VITA_SLIPPI
     if (final_data->vita_online_label != NULL) {
         GXColor label_color = { 0xC8, 0x95, 0x31, 0xFF };
         if (hovered_selection == SEL_1P_2) {
@@ -2253,6 +2255,7 @@ void fn_8022AFEC(HSD_GObj* gp)
         final_data->vita_online_label->hidden =
             final_data->state != MENU_STATE_IDLE;
     }
+#endif
 #ifdef MELEE_VITA_RUNTIME_RESOLUTION_MENU
     if (final_data->vita_options_label != NULL) {
         GXColor label_color = { 0xE0, 0xB8, 0x60, 0xFF };
@@ -2346,7 +2349,9 @@ HSD_GObj* mn_8022B3A0(u8 state)
     user_data->description = NULL;
 #ifdef TARGET_VITA
     user_data->vita_debug_label = NULL;
+#ifdef MELEE_VITA_SLIPPI
     user_data->vita_online_label = NULL;
+#endif
 #ifdef MELEE_VITA_RUNTIME_RESOLUTION_MENU
     user_data->vita_options_label = NULL;
     user_data->vita_resolution_panel = NULL;
@@ -3574,6 +3579,7 @@ void mn_8022D7F4(HSD_GObj* gp)
             mnEvent_8024E838(0, true);
             HSD_GObjFree(gp);
             break;
+#ifdef MELEE_VITA_SLIPPI
         case SEL_1P_2:
             /* Slippi Direct (Slippi's OnlineModeOptionSelected): Slippi's
              * Online submenu when its menu files are there, else straight
@@ -3596,6 +3602,7 @@ void mn_8022D7F4(HSD_GObj* gp)
                 gm_801A4B60();
             }
             break;
+#endif
         case SEL_1P_TRAINING:
             sfxForward();
             data = gm_GetCurrentSceneExitData();
@@ -4119,9 +4126,11 @@ static void mn_VitaMainMenuDataFree(void* user_data)
     if (data->vita_debug_label != NULL) {
         HSD_SisLib_803A5CC4(data->vita_debug_label);
     }
+#ifdef MELEE_VITA_SLIPPI
     if (data->vita_online_label != NULL) {
         HSD_SisLib_803A5CC4(data->vita_online_label);
     }
+#endif
 #ifdef MELEE_VITA_RUNTIME_RESOLUTION_MENU
     if (data->vita_options_label != NULL) {
         HSD_SisLib_803A5CC4(data->vita_options_label);

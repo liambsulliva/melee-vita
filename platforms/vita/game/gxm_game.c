@@ -1921,6 +1921,7 @@ void melee_vita_gxm_queue_overlay_full_width(vita2d_texture* texture,
     queue_overlay(texture, width, height, true);
 }
 
+#ifdef MELEE_VITA_SLIPPI
 /* ---- screen overlay ---- */
 
 /* What the game set for this frame (game thread only).  Present copies it
@@ -1957,6 +1958,7 @@ static vita2d_color_vertex* copy_overlay_vertices(
     }
     return output;
 }
+#endif
 
 /* ---- present ---- */
 
@@ -1964,12 +1966,16 @@ typedef struct RqPresent {
     f32 bar;
     GxrVertex* vertices;
     u16* indices;
+#ifdef MELEE_VITA_SLIPPI
+    /* The Slippi screen overlay (melee_vita_gxm_set_screen_overlay). */
     vita2d_color_vertex* overlay_triangles;
     u32 overlay_triangle_count;
     vita2d_color_vertex* overlay_lines;
     u32 overlay_line_count;
+#endif
 } RqPresent;
 
+#ifdef MELEE_VITA_SLIPPI
 /* The screen overlay, on the display target at 960 x 544 (render thread). */
 static void draw_screen_overlay(const RqPresent* p)
 {
@@ -2003,6 +2009,7 @@ static void draw_screen_overlay(const RqPresent* p)
         sceGxmSetBackPolygonMode(context, SCE_GXM_POLYGON_MODE_TRIANGLE_FILL);
     }
 }
+#endif
 
 static void exec_present_impl(const void* payload);
 static void exec_present(const void* payload)
@@ -2024,8 +2031,10 @@ static void exec_present_impl(const void* payload)
         vita2d_draw_rectangle(0.0f, 0.0f, p->bar + 1.0f, 544.0f, RGBA8(0, 0, 0, 255));
         vita2d_draw_rectangle(960.0f - p->bar - 1.0f, 0.0f, p->bar + 1.0f, 544.0f, RGBA8(0, 0, 0, 255));
     }
+#ifdef MELEE_VITA_SLIPPI
     /* At native resolution the frame is already on the display target. */
     if (!s_rendering_internal) draw_screen_overlay(p);
+#endif
     {
         const u64 end_start = sceKernelGetProcessTimeWide();
         vita2d_end_drawing();
@@ -2057,7 +2066,9 @@ static void exec_present_impl(const void* payload)
                 melee_vita_log_info(
                     "[GXM] internal EFB presentation draw unavailable");
         }
+#ifdef MELEE_VITA_SLIPPI
         draw_screen_overlay(p);
+#endif
         vita2d_end_drawing();
     }
 #ifdef MELEE_VITA_UPDATER
@@ -2066,11 +2077,13 @@ static void exec_present_impl(const void* payload)
         melee_vita_updater_render_dialog();
     }
 #endif
+#ifdef MELEE_VITA_SLIPPI
     {
         /* Slippi Direct's connect code keyboard (slippi/slippi_ui.c). */
         extern void melee_vita_slippi_render_dialog(void);
         melee_vita_slippi_render_dialog();
     }
+#endif
 #if defined(MELEE_VITA_PROFILER) && defined(MELEE_VITA_PROFILE_GPU_FINISH)
     {
         /* Diagnostic only: serializes CPU and GPU to measure how long the
@@ -2111,6 +2124,7 @@ void melee_vita_gxm_present(u32 clear_color)
         p->bar = melee_vita_widescreen_active()
             ? 0.0f
             : (960.0f - 544.0f * (73.0f / 60.0f)) * 0.5f;
+#ifdef MELEE_VITA_SLIPPI
         /* The screen overlay this frame set, if any.  The submit worker has
          * drained, so the frame's GPU memory is free to use here. */
         p->overlay_triangles = copy_overlay_vertices(
@@ -2121,6 +2135,7 @@ void melee_vita_gxm_present(u32 clear_color)
             s_overlay_lines, s_overlay_line_count);
         if (p->overlay_lines != NULL)
             p->overlay_line_count = s_overlay_line_count;
+#endif
         if (resolution_scaling_enabled() && !gxr_available()) {
             recorded->native_reasons |= MELEE_VITA_NATIVE_REASON_READBACK;
         } else if (resolution_scaling_enabled()) {
@@ -2165,8 +2180,10 @@ void melee_vita_gxm_present(u32 clear_color)
             }
         }
     }
+#ifdef MELEE_VITA_SLIPPI
     /* The next frame shows an overlay only if it sets one again. */
     melee_vita_gxm_set_screen_overlay(NULL, 0u, NULL, 0u);
+#endif
     native_reasons = effective_native_reasons(recorded->native_reasons);
     if (native_reasons & MELEE_VITA_NATIVE_REASON_COPY)
         ++native_copy_frames;

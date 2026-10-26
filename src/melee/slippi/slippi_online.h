@@ -8,6 +8,7 @@
 #include <Runtime/platform.h>
 #include <dolphin/pad.h>
 
+#ifdef MELEE_VITA_SLIPPI
 /* ---- the match, slippi_online.c ---- */
 /* 1 from the start of an online match until its scene exits. */
 int mp_slippi_online_active(void);
@@ -52,5 +53,36 @@ void mp_slippi_menu_prepare(void);
 /* ---- the overlay, slippi_online_hud.c ---- */
 /* Called from DevText_DrawAll (textdraw.c) on every screen. */
 void mp_slippi_online_draw_hud(void);
+
+#else
+/* Builds without -EnableSlippi have no online play: the hooks in the game
+ * code compile away and the menus stay vanilla. */
+static inline int mp_slippi_online_active(void) { return 0; }
+static inline int mp_slippi_online_pad_renew(PADStatus* pad)
+{
+    (void) pad;
+    return 0;
+}
+static inline void mp_slippi_online_frame_begin(void) {}
+static inline void mp_slippi_online_frame_end(void) {}
+static inline void mp_slippi_tick_without_draw(void) {}
+static inline void mp_slippi_online_start_melee(StartMeleeData* d) { (void) d; }
+static inline void mp_slippi_online_match_exit(void) {}
+static inline int mp_slippi_css_online(void) { return 0; }
+static inline int mp_slippi_css_frame(int ready, PlayerInitData* local,
+                                      PlayerInitData* remote, u32 trigger, u32 held)
+{
+    (void) ready;
+    (void) local;
+    (void) remote;
+    (void) trigger;
+    (void) held;
+    return 0;
+}
+static inline int mp_slippi_css_quiet(void) { return 0; }
+static inline void mp_slippi_sss_toggle_alt(void) {}
+static inline void mp_slippi_menu_prepare(void) {}
+static inline void mp_slippi_online_draw_hud(void) {}
+#endif
 
 #endif

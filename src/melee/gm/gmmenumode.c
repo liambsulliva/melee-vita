@@ -2,7 +2,9 @@
 
 #include "gm_1A3F.h"
 #include <melee/slippi/slippi_online.h>
+#ifdef MELEE_VITA_SLIPPI
 #include <melee/slippi/slippi_platform.h>
+#endif
 #include "gm_unsplit.h"
 #include "gmmain_lib.h"
 #include "gmmenumode_return.h"
@@ -115,6 +117,7 @@ void onEnter(GameModeState* scene)
         previous_mode = gm_801737D8();
     }
     switch (previous_mode) {
+#ifdef MELEE_VITA_SLIPPI
     case GM_HANYU_CSS:
         /* Slippi Direct: back on Direct in Slippi's Online submenu, or on
          * Online Play without Slippi's menu files. */
@@ -126,6 +129,7 @@ void onEnter(GameModeState* scene)
             data->hovered_selection = SEL_1P_2;
         }
         return;
+#endif
     case GM_CLASSIC:
         data->menu_kind = MENU_KIND_REG;
         data->hovered_selection = SEL_REG_CLASSIC;

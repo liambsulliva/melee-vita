@@ -14,6 +14,9 @@ param(
     # Slippi Direct play: GameCube-exact floating point (platforms/vita/fp).
     # Needs the contraction plugin that build-full.ps1 builds.
     [switch]$EnableExactMath,
+    # Slippi Direct play's hooks in the game code (MELEE_VITA_SLIPPI).
+    # build-full.ps1 -EnableSlippi turns this and exact maths on together.
+    [switch]$EnableSlippi,
     [string]$FpContractPlugin,
     [string]$VitaReleaseVersion,
     [string]$VitaBuildNumber = $env:MELEE_VITA_BUILD_NUMBER
@@ -53,6 +56,7 @@ if ($EnableDirectSnag) { $variantParts += 'DirectSnag' }
 if ($EnableRenderTrace) { $variantParts += 'RenderTrace' }
 if ($EnableRuntimeResolutionMenu) { $variantParts += 'RuntimeResolution' }
 if ($EnableExactMath) { $variantParts += 'ExactMath' }
+if ($EnableSlippi) { $variantParts += 'Slippi' }
 $variantParts += "Vita$($VitaReleaseVersion -replace '\.', '_')"
 $variantParts += "Build$($VitaBuildNumber -replace '\.', '_')"
 $variant = $variantParts -join '-'
@@ -158,6 +162,9 @@ $common += '-DMELEE_VITA_GPU_BUMP_DL=1'
 # sources carry these console-rounding annotations from the 3DS Slippi port
 # (tools/slippi/apply_3ds_edits.py), so every build needs them.
 $common += @('-include', (Join-Path $root 'platforms/vita/fp/mp_fp.h'))
+if ($EnableSlippi) {
+    $common += '-DMELEE_VITA_SLIPPI=1'
+}
 if ($EnableExactMath) {
     if (-not $FpContractPlugin -or -not (Test-Path -LiteralPath $FpContractPlugin -PathType Leaf)) {
         throw "-EnableExactMath needs -FpContractPlugin pointing at the built plugin (build-full.ps1 builds it)."

@@ -2139,6 +2139,7 @@ static inline bool gm_8016E9C8_inline(void)
     }
 }
 
+#ifdef MELEE_VITA_SLIPPI
 /* Slippi online play: ends the match as a no contest, the way Slippi's
  * FN_END_GAME does after a disconnect or a desync. */
 void mp_slippi_gmvs_end_online(int pauser)
@@ -2148,6 +2149,7 @@ void mp_slippi_gmvs_end_online(int pauser)
     /* Slippi shortens the GAME! screen from 110 frames. */
     controller.start.xD = 90;
 }
+#endif
 
 void gm_Scene_Vs_OnExit(void* user_data)
 {

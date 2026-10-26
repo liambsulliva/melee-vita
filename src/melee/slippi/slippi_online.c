@@ -20,6 +20,7 @@
  *
  * Frame numbers: online frame N is the pad the engine body consumes while
  * its unpaused frame counter (gm_801A4BB8) is N. */
+#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
 #include "slippi_online.h"
 
 #include "slippi_match_block.h"
@@ -692,3 +693,5 @@ void mp_slippi_online_match_exit(void)
              (int) on.dropped, 0);
     on.active = 0;
 }
+
+#endif /* MELEE_VITA_SLIPPI */

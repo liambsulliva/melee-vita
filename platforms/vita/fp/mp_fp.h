@@ -11,6 +11,7 @@
 #ifndef MP_FP_H
 #define MP_FP_H
 
+#ifdef MELEE_VITA_EXACT_MATH
 /* One product rounded on its own before the surrounding sum: the plugin only
  * fuses a product that is an unnamed temporary of the same expression, and
  * mu_p_ is a named local. */
@@ -44,5 +45,21 @@ static inline __attribute__((always_inline)) float mp_fnmsubs(float a, float c, 
 
 float mp_sqrtf_accurate(float x); /* MSL sqrtf with a fourth Newton step */
 double mp_fres(double x);         /* Gekko fres estimate */
+
+#else
+/* Without exact maths (no -EnableSlippi or -EnableExactMath) the
+ * annotations are plain arithmetic, so the game compiles as it did before
+ * the Slippi work. */
+#define MU_P(x) (x)
+#define mp_fmadds(a, c, b) ((a) * (c) + (b))
+#define mp_fmsubs(a, c, b) ((a) * (c) - (b))
+#define mp_fnmsubs(a, c, b) (-((a) * (c) - (b)))
+#define mu_fmadds mp_fmadds
+#define mu_fmsubs mp_fmsubs
+#define mu_fnmsubs mp_fnmsubs
+#define __fnmsubs mp_fnmsubs
+#define MU_FMADDS(a, b, c) mp_fmadds((float) (a), (float) (b), (float) (c))
+#define MU_NO_CONTRACT
+#endif
 
 #endif

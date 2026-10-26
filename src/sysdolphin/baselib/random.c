@@ -3,7 +3,7 @@
 static u32 seed = 1;
 u32* HSD_RandSeedPtr = &seed;
 
-#ifdef TARGET_VITA
+#ifdef MELEE_VITA_SLIPPI
 /* The Slippi replay test lists who called the RNG in a frame whose seed
  * came out wrong (src/melee/slippi/slippi_replay.c). */
 void mp_slippi_replay_note_rng(void* caller);
@@ -28,7 +28,7 @@ f32 HSD_Randf(void)
 
 s32 HSD_Randi(s32 max_val)
 {
-#ifdef TARGET_VITA
+#ifdef MELEE_VITA_SLIPPI
     /* The same as max_val * HSD_Rand() / (1 << 16), but done here, so the
      * caller noted is the one that called HSD_Randi. */
     s32 value;

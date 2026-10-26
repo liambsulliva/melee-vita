@@ -3,7 +3,7 @@
 #include <dolphin/pad.h>
 
 #include "pad_vita.h"
-#ifndef TARGET_PS5
+#ifdef MELEE_VITA_SLIPPI
 #include "../slippi/slippi_ui.h"
 #endif
 #include "../vita_log.h"
@@ -295,7 +295,7 @@ u32 PADRead(PADStatus* status)
     s_raw_buttons_triggered |= vita.buttons & ~s_raw_buttons;
     s_raw_buttons = vita.buttons;
     fill_status(&status[0], &vita, s_is_pstv && analog_read > 0 ? &analog : NULL);
-#ifndef TARGET_PS5
+#ifdef MELEE_VITA_SLIPPI
     /* Slippi Direct: the online CSS keyboard and lock-in take buttons
      * away from the game (slippi/slippi_ui.c). */
     melee_vita_slippi_pad_filter(&status[0]);

@@ -5613,6 +5613,7 @@ void mnCharSel_Scene_OnEnter(void* arg0)
     mnCharSel_802640A0();
 }
 
+#ifdef MELEE_VITA_SLIPPI
 /* Slippi Direct (InitSheikSelector): the Zelda icon picks Sheik or Zelda.
  * The online CSS plays Sheik, the vanilla CSS keeps Zelda. */
 void mp_slippi_css_sheik(int sheik)
@@ -5655,6 +5656,8 @@ void mp_slippi_css_hide_title(void)
         HSD_JObjSetFlagsAll(jobj, JOBJ_HIDDEN);
     }
 }
+
+#endif
 
 void mnCharSel_Scene_OnFrame(void)
 {

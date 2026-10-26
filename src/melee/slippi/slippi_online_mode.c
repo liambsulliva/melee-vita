@@ -14,6 +14,7 @@
  * Ported from the 3DS Slippi port (melee-3ds slippi-beta-v0.1.0,
  * native-3ds/port/engine/slippi/online_mode.c).  Left out for now: the VS
  * splash (off on the 3DS too) and Slippi's own CSS art (slpCSS.dat). */
+#ifdef MELEE_VITA_SLIPPI /* only in -EnableSlippi builds */
 #include "slippi_online.h"
 
 #include "slippi_platform.h"
@@ -383,3 +384,5 @@ static void vs_exit(GameModeState* state)
     css_quiet = 0;
     gm_SetNextGameModeStateId(ST_CSS);
 }
+
+#endif /* MELEE_VITA_SLIPPI */
