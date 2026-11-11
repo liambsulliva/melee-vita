@@ -1,32 +1,26 @@
-# Smash Melee — experimental PS Vita and PS5 ports
+# Smash Melee — experimental PS Vita port
 
-Native ports of **Super Smash Bros. Melee (NTSC-U 1.02)** to the **PlayStation
-Vita** and the **PlayStation 5**, developed on the
+A native port of **Super Smash Bros. Melee (NTSC-U 1.02)** to the
+**PlayStation Vita**, developed on the
 [`vita-port` branch](https://github.com/zm2283145/melee-Vita/tree/vita-port).
 
-These are not emulators. The game code from
+This is not an emulator. The game code from
 [doldecomp/melee](https://github.com/doldecomp/melee) and
-[melee-pc](https://github.com/999sian/melee-pc) is compiled for each console,
+[melee-pc](https://github.com/999sian/melee-pc) is compiled for the Vita,
 and the GameCube platform services are replaced with native input, disc
-access, audio, saves, movie playback and a GX renderer.
+access, audio, saves, movie playback and a GX renderer (GX → GXM, shaders
+built with vitaShaRK).
 
-**Both ports are experimental.** Expect slowdowns, visual or audio issues and
-possible crashes. Back up your saves before trying a new build.
-
-| | PS Vita | PS5 |
-| --- | --- | --- |
-| Status | Releases on GitHub (current: **0.8.15**) | New; builds from CI |
-| Renderer | GX → GXM, shaders built with vitaShaRK | GX → OpenGL 4.6 ([ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl), Mesa over AGC) |
-| Performance | Varies by scene; not locked | 60 fps menus; matches near 60 |
-| Controllers | Built-in controls, 1 player | Up to 4 DualSense pads |
-| Resolution | Presets and a Settings menu; 960×544 output | Up to 4K render and 4K output |
-| Docs | [PS Vita](#ps-vita) below | [platforms/ps5/README.md](platforms/ps5/README.md) |
+**The port is experimental.** Expect slowdowns, visual or audio issues and
+possible crashes. Back up your saves before trying a new build. Releases are
+on GitHub (current: **0.8.15**). Menus and matches are not locked to 60 fps.
+One local player uses the built-in controls. Output is 960×544, with graphics
+presets and a Settings menu.
 
 You need your own legally obtained, **uncompressed** Melee NTSC-U 1.02 disc
-image (`GALE01`), named `GALE01.iso`, on either console. Other regions,
-revisions and compressed RVZ/CISO images are not supported. No game data or
-proprietary console module is distributed with this project, and you do not
-need a disc image to compile.
+image (`GALE01`), named `GALE01.iso`. Other regions, revisions and compressed
+RVZ/CISO images are not supported. No game data or proprietary console module
+is distributed with this project, and you do not need a disc image to compile.
 
 ---
 
@@ -189,30 +183,7 @@ WSL to include Online Play.
 More flags and toolchain notes are in the
 [Vita build instructions](platforms/vita/README.md). The **Vita build and
 draft release** workflow builds every push to `vita-port` and drafts a
-release, with both the Vita VPK and the PS5 build, when the shared version in
-`platforms/vita/version.json` is bumped.
-
----
-
-## PS5
-
-A native homebrew folder title for jailbroken PS5 consoles. It has been
-tested on firmware 13.60 with kstuff, etaHEN and ShadowMountPlus.
-
-- **What you need:** a PS5 that runs homebrew folder titles, an FTP payload
-  (port 2121) and your `GALE01.iso`.
-- **Install:** copy the `PPSA99701` folder to `/data/homebrew/PPSA99701`, and
-  put your disc image at `/data/homebrew/PPSA99701/GALE01.iso`.
-- **Get a build:** download `SmashMeleePS5-<version>.zip` from a published
-  release, use a CI artifact from the Actions tab, or build it yourself on
-  Linux/WSL. PS5 and Vita releases share one version number.
-- **Features:** up to 4 controllers (each signed in to a PS5 user), a **PS5
-  Options** menu with button remapping, render resolution up to 4K and video
-  output at 1080p/1440p/4K, and the same hidden debug menu. On PS5, Select is
-  the left half of the touch pad.
-
-Full requirements, controls, install steps and build instructions are in
-**[platforms/ps5/README.md](platforms/ps5/README.md)**.
+release when the version in `platforms/vita/version.json` is bumped.
 
 ---
 
@@ -222,8 +193,7 @@ Please report problems in
 [GitHub Issues](https://github.com/zm2283145/melee-Vita/issues). Check for an
 existing report first, then include:
 
-- the console (Vita or PS5), the release or commit ID, and the firmware and
-  plugins/payloads you use;
+- the release or commit ID, and the firmware and plugins you use;
 - the game mode, characters and stage;
 - clear steps to reproduce, what you expected, and whether it happens again
   once shaders are cached.
@@ -233,20 +203,20 @@ proprietary modules or personal information.
 
 ## Scope
 
-Online play and rollback are not implemented on either console. The desktop
-launcher, settings overlay, custom soundtrack streaming and PC cheat toggles
-are PC-only. The inherited [PC README](README-PC.md) and [roadmap](ROADMAP.md)
-describe the upstream PC project, not promises for these ports.
+Slippi on Vita is Direct play only, and only in a build made with
+`-EnableSlippi`. Rollback netplay is not implemented. The desktop launcher,
+settings overlay, custom soundtrack streaming and PC cheat toggles are
+PC-only. The inherited [PC README](README-PC.md) and [roadmap](ROADMAP.md)
+describe the upstream PC project, not promises for this port.
 
 ## Credits and licensing
 
 Thanks to the Melee decompilation and melee-pc contributors, aurora, VitaSDK,
-vita2d, vitaShaRK, SceShaccCgExt, the Vita homebrew community, and the
-ps5-payload-sdk, ps5-native-app-boilerplate and ps5-opengl projects. The
-updated LiveArea artwork is by Reddit user
-[u/cool_pain_6315](https://www.reddit.com/user/cool_pain_6315/). The PS5
-home-screen art and music are original to this port. The Vita VPK includes
-five alternate Giga Bowser costume archives from the supplied mod pack.
+vita2d, vitaShaRK, SceShaccCgExt and the Vita homebrew community. The updated
+LiveArea artwork is by Reddit user
+[u/cool_pain_6315](https://www.reddit.com/user/cool_pain_6315/). The Vita VPK
+includes five alternate Giga Bowser costume archives from the supplied mod
+pack.
 
 This project is not affiliated with Nintendo, HAL Laboratory or Sony. Read
 [LICENSE.md](LICENSE.md) and [COPYING](COPYING) before redistributing. The
