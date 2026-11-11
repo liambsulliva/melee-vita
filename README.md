@@ -19,7 +19,7 @@ possible crashes. Back up your saves before trying a new build.
 | Renderer | GX → GXM, shaders built with vitaShaRK | GX → OpenGL 4.6 ([ps5-opengl](https://github.com/blackbearreloaded/ps5-opengl), Mesa over AGC) |
 | Performance | Varies by scene; not locked | 60 fps menus; matches near 60 |
 | Controllers | Built-in controls, 1 player | Up to 4 DualSense pads |
-| Resolution | Scaled internal resolution, 960×544 output | Up to 4K render and 4K output |
+| Resolution | Presets and a Settings menu; 960×544 output | Up to 4K render and 4K output |
 | Docs | [PS Vita](#ps-vita) below | [platforms/ps5/README.md](platforms/ps5/README.md) |
 
 You need your own legally obtained, **uncompressed** Melee NTSC-U 1.02 disc
@@ -74,9 +74,51 @@ The built-in controls act as GameCube controller port 1.
 | Select | Z (grab) |
 | Start | Start / pause |
 
-Touch controls, rumble, external controllers and more than one human player
-are not supported on Vita. Open **Options → Vita Options** to change the menu
-and gameplay render resolution or remap buttons. The settings persist.
+Touch controls, rumble, external controllers and more than one local player
+are not supported on Vita. Button mapping and render resolution are in the
+Settings menu below, and also under **Options → Vita Options**. Both save
+the same settings.
+
+### Settings
+
+The LiveArea bubble has a **Settings** button. It opens a settings screen
+instead of booting Melee. Choices are saved to `ux0:data/melee/graphics.txt`
+and read the next time the game starts.
+
+Three presets cover the usual tradeoff:
+
+- **Ultra** aims for 60 fps in every 1v1, with stage cutbacks and potato mode
+  on Fountain of Dreams and Yoshi's Story.
+- **Performance** keeps lighter stages and 60 fps in 1v1s, with Fountain of
+  Dreams dropped to 30.
+- **Quality** runs matches at a locked 30 and keeps the sharper picture.
+
+Changing a value off its preset turns the choice into **Custom**. Menus stay
+at 60 even when matches are locked to 30. A match with 3 or 4 players, or
+Fountain of Dreams without cutbacks, can drop to a locked 30 while the game
+logic still runs at full speed.
+
+The same screen sets 16:9 or pillarboxed 4:3, a temporary unlock of every
+character and stage (the memory card is not changed), tournament VS rules
+(4 stocks, 8 minutes, items off, team attack on, pause off, legal stages),
+UCF 0.84 (a wider dashback window and shield drops that do not become spot
+dodges), an FPS counter, button remapping, and stick calibration with
+deadzones. There is also a benchmark that plays six stages and writes a
+report.
+
+### Slippi
+
+Online play is Slippi Direct, and it is off unless the VPK is built with
+`-EnableSlippi`. A normal Release build has no online menus.
+
+With that flag, **1P Mode** gains **Online Play**. Two Vitas connect directly
+and play a 1v1. Online play needs both games to simulate the match the same
+way, so the flag also turns on GameCube-exact floating point. Building that
+needs Linux, macOS, or WSL: the Windows VitaSDK GCC cannot load the plugin,
+and the host needs a C++ compiler plus GMP headers.
+
+This is early. Expect desyncs and disconnects. Local play does not need the
+flag.
 
 ### Shader compilation and stutter
 
@@ -108,17 +150,47 @@ camera, collision overlays and match shortcuts.
 
 ### Building
 
-See the [Vita build instructions](platforms/vita/README.md) for the toolchain
-and dependencies. The normal build is:
+The build runs on **Windows or Linux**. It is a PowerShell script and is not
+set up for macOS. You do not need a disc image to compile; `GALE01.iso` is
+only required on the Vita, at `ux0:data/melee/GALE01.iso`.
+
+On the build machine:
+
+- PowerShell 7 (`pwsh`) and Python 3.
+- [VitaSDK](https://vitasdk.org/) with GCC 15. The build needs big-endian
+  `scalar_storage_order`. Set `VITASDK` and put `$VITASDK/bin` on `PATH`.
+- `libvita2d`, taiHEN import stubs, pthread support, and the SDK system stubs,
+  installed into that SDK.
+- [SceShaccCgExt](https://github.com/bythos14/SceShaccCgExt), then
+  [vitaShaRK](https://github.com/Rinnegatamante/vitaShaRK). Install
+  SceShaccCgExt first.
+
+From a checkout of the `vita-port` branch:
 
 ```powershell
-.\platforms\vita\build-full.ps1 -Configuration Release
+$env:VITASDK = 'C:\vitasdk'
+$env:PATH = "$env:VITASDK\bin;$env:PATH"
+.\platforms\vita\build-full.ps1 -Configuration Release -Jobs 8
 ```
 
-The output is `build-vita/full/SmashMeleevita.vpk`. Release builds are
-optimized and have no logging, debugger support or debug symbols. The
-**Vita build and draft release** workflow builds every push to `vita-port`
-and drafts a release, with both the Vita VPK and the PS5 build, when the shared version in `platforms/vita/version.json` is bumped.
+On Linux, set `VITASDK` and `PATH` the same way, then run:
+
+```sh
+pwsh -NoProfile -File platforms/vita/build-full.ps1 -Configuration Release -Jobs 2
+```
+
+The package is `build-vita/full/SmashMeleevita.vpk` (title **Smash Melee
+Vita**, title ID `MLVITA002`). Install it with VitaShell. Homebrew must be
+enabled, with Unsafe Homebrew on, and `libshacccg.suprx` must be at
+`ur0:data/libshacccg.suprx`. Release builds are optimized and have no logging,
+debugger support, or debug symbols. Add `-EnableSlippi` on Linux, macOS, or
+WSL to include Online Play.
+
+More flags and toolchain notes are in the
+[Vita build instructions](platforms/vita/README.md). The **Vita build and
+draft release** workflow builds every push to `vita-port` and drafts a
+release, with both the Vita VPK and the PS5 build, when the shared version in
+`platforms/vita/version.json` is bumped.
 
 ---
 
