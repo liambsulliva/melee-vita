@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: vita-${{ github.ref }}
+  group: vita-build-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
