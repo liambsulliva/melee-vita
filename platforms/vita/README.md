@@ -5,7 +5,7 @@ the [main Vita README](../../README.md).
 
 ## Full-game Release build
 
-`build-full.ps1` is the full-game build entry point on Windows and Linux. It
+`build-full.ps1` is the full-game build entry point on macOS, Windows, and Linux. It
 compiles the Melee/HSD sources, the native Vita platform layer, and the THP
 decoder, then creates a SELF and a VPK with LiveArea assets.
 
@@ -18,7 +18,7 @@ are kept, so an eboot-only swap can also use a previously installed set.
 Required on the build machine:
 
 - PowerShell **7 or newer** (`pwsh`) and Python 3 (`python` on Windows,
-  `python3` on Linux).
+  `python3` on macOS and Linux). On macOS, `brew install powershell`.
 - [VitaSDK](https://vitasdk.org/) with `VITASDK` set and its `bin` directory on
   `PATH`. The build needs GCC's big-endian `scalar_storage_order` support;
   the CI SDK uses GCC 15.
@@ -34,6 +34,17 @@ $env:VITASDK = 'C:\vitasdk'
 $env:PATH = "$env:VITASDK\bin;$env:PATH"
 .\platforms\vita\build-full.ps1 -Configuration Release -Jobs 8
 ```
+
+On macOS, install PowerShell 7 (`brew install powershell`). If VitaSDK is at
+`/usr/local/vitasdk`, the script finds it without `VITASDK`. From the
+repository root:
+
+```sh
+pwsh -NoProfile -File platforms/vita/build-full.ps1 -Configuration Release -Jobs 8
+```
+
+`-EnableSlippi` works on macOS. It builds a host GCC plugin with `g++` (or
+`$CXX`) and needs GMP headers (`brew install gmp`).
 
 On Linux, set `VITASDK` and add `$VITASDK/bin` to `PATH`, then run:
 

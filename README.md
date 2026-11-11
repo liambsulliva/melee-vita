@@ -144,13 +144,14 @@ camera, collision overlays and match shortcuts.
 
 ### Building
 
-The build runs on **Windows or Linux**. It is a PowerShell script and is not
-set up for macOS. You do not need a disc image to compile; `GALE01.iso` is
-only required on the Vita, at `ux0:data/melee/GALE01.iso`.
+The build runs on **macOS, Windows, and Linux**. You do not need a disc image
+to compile; `GALE01.iso` is only required on the Vita, at
+`ux0:data/melee/GALE01.iso`.
 
 On the build machine:
 
-- PowerShell 7 (`pwsh`) and Python 3.
+- PowerShell 7 (`pwsh`; on macOS, `brew install powershell`) and Python 3
+  (`python3` on macOS and Linux).
 - [VitaSDK](https://vitasdk.org/) with GCC 15. The build needs big-endian
   `scalar_storage_order`. Set `VITASDK` and put `$VITASDK/bin` on `PATH`.
 - `libvita2d`, taiHEN import stubs, pthread support, and the SDK system stubs,
@@ -167,7 +168,14 @@ $env:PATH = "$env:VITASDK\bin;$env:PATH"
 .\platforms\vita\build-full.ps1 -Configuration Release -Jobs 8
 ```
 
-On Linux, set `VITASDK` and `PATH` the same way, then run:
+On macOS, from the repository root. VitaSDK at `/usr/local/vitasdk` is picked
+up when `VITASDK` is unset:
+
+```sh
+pwsh -NoProfile -File platforms/vita/build-full.ps1 -Configuration Release -Jobs 8
+```
+
+On Linux, set `VITASDK` and `PATH` the same way as Windows, then run:
 
 ```sh
 pwsh -NoProfile -File platforms/vita/build-full.ps1 -Configuration Release -Jobs 2

@@ -50,9 +50,14 @@ $ErrorActionPreference = 'Stop'
 # Online play only works when both games simulate bit for bit, so Slippi
 # builds always use exact maths.
 $EnableExactMath = $EnableSlippi.IsPresent
+# The VitaSDK macOS installer uses this prefix and does not set VITASDK.
+if (-not $VitaSdk -and $IsMacOS -and (Test-Path '/usr/local/vitasdk/bin/arm-vita-eabi-gcc')) {
+    $VitaSdk = '/usr/local/vitasdk'
+}
 if (-not $VitaSdk) {
     throw 'VITASDK is not set. Pass -VitaSdk or set the VITASDK environment variable.'
 }
+$python = (Get-Command $(if ($IsWindows) { 'python' } else { 'python3' }) -ErrorAction Stop).Source
 
 $root = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 
@@ -700,12 +705,12 @@ if ($EnableUpdater) {
         'Melee Vita Updater', $helperSfo
     )
     $mainHead = Join-Path $build 'head.bin'
-    & python (Join-Path $PSScriptRoot 'updater/make-head-bin.py') `
+    & $python (Join-Path $PSScriptRoot 'updater/make-head-bin.py') `
         --template $headTemplate --title-id MLVITA002 --output $mainHead
     if ($LASTEXITCODE -ne 0) {
         throw "Generating the Melee package head failed with exit code $LASTEXITCODE"
     }
-    & python (Join-Path $PSScriptRoot 'updater/make-head-bin.py') `
+    & $python (Join-Path $PSScriptRoot 'updater/make-head-bin.py') `
         --template $headTemplate --title-id MLVUPD001 --output $helperHead
     if ($LASTEXITCODE -ne 0) {
         throw "Generating the updater package head failed with exit code $LASTEXITCODE"
