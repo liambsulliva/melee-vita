@@ -6,6 +6,23 @@ supply at runtime.
 
 Only **USA revision 2 (NTSC-U 1.02, GALE01)** is supported.
 
+## Changes in Vita v0.8.17
+
+This VPK includes Slippi Direct and the Settings screen. It does not include
+a disc image. Copy your own uncompressed NTSC-U 1.02 `GALE01.iso` to
+`ux0:data/melee/GALE01.iso` with VitaShell.
+
+- **Online Play** is under **1P Mode**. Two Vitas connect directly for a 1v1.
+  This is early: expect disconnects and desyncs. Local play does not need a
+  network.
+- **Settings** is the button on the LiveArea bubble. The first boot uses the
+  **Performance** preset (16:9, lighter stages, 60 fps in 1v1s) until you
+  change it. Ultra, Quality, controls, stick calibration, UCF, tournament
+  rules, and unlock-everything are on that screen. Choices are saved on the
+  Vita and kept across updates.
+- The old compile-time resolution experiments are no longer how the release
+  build chooses a picture size. The Settings preset does.
+
 ## Changes in Vita v0.8.16
 
 This release adds a brand-new **PlayStation 5 version** alongside the Vita

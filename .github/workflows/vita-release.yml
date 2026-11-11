@@ -19,7 +19,7 @@ jobs:
     name: Build Vita VPK
     if: github.ref == 'refs/heads/vita-port' || github.event_name == 'pull_request'
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,7 +30,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             build-essential cmake ninja-build python3 python3-cryptography \
-            curl bzip2 xz-utils
+            curl bzip2 xz-utils libgmp-dev
           echo "VITASDK=$RUNNER_TEMP/vitasdk" >> "$GITHUB_ENV"
 
       - name: Install pinned Vita toolchain and libraries
@@ -131,10 +131,11 @@ jobs:
           $publicKey = (
             Get-Content platforms/vita/updater/public-key.hex -Raw
           ).Trim()
+          # Slippi Direct is in the release VPK. Graphics, controls, and UCF
+          # come from the Settings screen; with no graphics.txt the game boots
+          # on the Performance preset. The disc image is not packaged.
           ./platforms/vita/build-full.ps1 -Configuration Release -Jobs 2 `
-            -InternalResolutionScale 60 -GameplayInternalResolutionScale 75 `
-            -EnableScaledShadowFrames -EnableScaledGxCopyFrames `
-            -EnableRuntimeResolutionMenu `
+            -EnableSlippi `
             -EnableUpdater -UpdaterPublicKeyHex $publicKey `
             -VitaBuildNumber "${{ github.run_number }}.${{ github.run_attempt }}"
 
@@ -153,6 +154,14 @@ jobs:
           fi
           if ! grep -Eq ' mnVitaDebug_FeedActivation$' build-vita/symbols.txt; then
             echo "::error::Release ELF is missing the hidden debug-menu gate"
+            exit 1
+          fi
+          if ! grep -Eq ' mp_slippi_online_active$' build-vita/symbols.txt; then
+            echo "::error::Release ELF was not built with -EnableSlippi"
+            exit 1
+          fi
+          if ! grep -Eq ' settings_app_run$' build-vita/symbols.txt; then
+            echo "::error::Release ELF is missing the Settings screen"
             exit 1
           fi
           arm-vita-eabi-readelf --sections \

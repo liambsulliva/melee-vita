@@ -13,7 +13,7 @@ built with vitaShaRK).
 
 **The port is experimental.** Expect slowdowns, visual or audio issues and
 possible crashes. Back up your saves before trying a new build. Releases are
-on GitHub (current: **0.8.15**). Menus and matches are not locked to 60 fps.
+on GitHub (current: **0.8.17**). Menus and matches are not locked to 60 fps.
 One local player uses the built-in controls. Output is 960×544, with graphics
 presets and a Settings menu.
 
@@ -43,7 +43,9 @@ kubridge, and contains no DebugNet logger or GDB server.
 ### Install and run
 
 1. Download `SmashMeleevita-<version>.vpk` from a **published release** in
-   [Releases](https://github.com/zm2283145/melee-Vita/releases).
+   [Releases](https://github.com/zm2283145/melee-Vita/releases). The release
+   VPK is built with Slippi Direct and the Settings screen. It does not
+   contain a disc image.
 2. Install it with VitaShell. It uses title ID **`MLVITA002`** and appears as
    **Smash Melee Vita** in LiveArea.
 3. Copy your disc image to **`ux0:data/melee/GALE01.iso`**. Check that the
