@@ -203,7 +203,7 @@ jobs:
               assert vpk.read("sce_sys/homebrew_update.ini").decode("ascii") == (
                   "title_id=MLVITA002\n"
                   "name=Smash Melee Vita\n"
-                  "update_url=https://github.com/zm2283145/melee-Vita/"
+                  "update_url=https://github.com/liambsulliva/melee-vita/"
                   "releases/latest/download/MLVITA002-ver.xml\n"
               )
               sfo = vpk.read("sce_sys/param.sfo")

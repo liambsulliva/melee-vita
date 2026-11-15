@@ -46,7 +46,7 @@ using melee::vita::update::SignedManifest;
 using melee::vita::update::StagingDecision;
 
 constexpr const char* kLatestReleaseUrl =
-    "https://api.github.com/repos/zm2283145/melee-Vita/releases/latest";
+    "https://api.github.com/repos/liambsulliva/melee-vita/releases/latest";
 constexpr const char* kCaBundle = "vs0:data/external/cert/CA_LIST.cer";
 constexpr unsigned kHealthFrames = 300;
 

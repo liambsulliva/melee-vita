@@ -39,7 +39,7 @@ def main() -> None:
     parser.add_argument("--version-file", type=Path, required=True)
     parser.add_argument("--release-notes", type=Path, required=True)
     parser.add_argument("--vpk", type=Path, required=True)
-    parser.add_argument("--repository", default="zm2283145/melee-Vita")
+    parser.add_argument("--repository", default="liambsulliva/melee-vita")
     parser.add_argument("--output-directory", type=Path, required=True)
     args = parser.parse_args()
 

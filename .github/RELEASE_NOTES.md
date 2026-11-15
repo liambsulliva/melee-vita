@@ -6,54 +6,39 @@ supply at runtime.
 
 Only **USA revision 2 (NTSC-U 1.02, GALE01)** is supported.
 
+## Changes in Vita v0.8.18
+
+Vita only. PS5 is not supported. Slippi Direct and the Settings screen. No
+disc image is included. Copy your own uncompressed NTSC-U 1.02 `GALE01.iso`
+to `ux0:data/melee/GALE01.iso`.
+
+- The gameplay resolution in Settings and in Vita Options now works, and so do
+  the presets that set it. Before this, matches always drew at 100% on the
+  release build.
+- The in-game updater now checks this repository and has a new signing key.
+  Install this VPK by hand with VitaShell once. After that, updates come
+  through the in-game updater.
+
 ## Changes in Vita v0.8.17
 
-This VPK includes Slippi Direct and the Settings screen. It does not include
-a disc image. Copy your own uncompressed NTSC-U 1.02 `GALE01.iso` to
-`ux0:data/melee/GALE01.iso` with VitaShell.
+Vita only. PS5 is not supported. Slippi Direct and the Settings screen. No
+disc image is included. Copy your own uncompressed NTSC-U 1.02 `GALE01.iso`
+to `ux0:data/melee/GALE01.iso`.
 
-- **Online Play** is under **1P Mode**. Two Vitas connect directly for a 1v1.
-  This is early: expect disconnects and desyncs. Local play does not need a
-  network.
-- **Settings** is the button on the LiveArea bubble. The first boot uses the
-  **Performance** preset (16:9, lighter stages, 60 fps in 1v1s) until you
-  change it. Ultra, Quality, controls, stick calibration, UCF, tournament
-  rules, and unlock-everything are on that screen. Choices are saved on the
-  Vita and kept across updates.
-- The old compile-time resolution experiments are no longer how the release
-  build chooses a picture size. The Settings preset does.
+- **1P Mode → Online Play** connects two Vitas for a direct 1v1.
+- **Settings** on the LiveArea bubble. First boot uses the Performance preset
+  (16:9, lighter stages). Ultra, Quality, controls, stick calibration, UCF,
+  tournament rules, and unlock-everything are on that screen and are saved
+  on the Vita.
 
 ## Changes in Vita v0.8.16
 
-This release adds a brand-new **PlayStation 5 version** alongside the Vita
-version. Both share the same version number from now on.
-
-### New: PS5 version (experimental)
-
-- Smash Melee now runs on **jailbroken PS5 consoles** as a homebrew app. You
-  still need your own `GALE01.iso`. Download `SmashMeleePS5-0.8.16.zip`, and
-  see `PS5-README.md` for install steps.
-- Menus run at a smooth 60 FPS, and matches stay close to 60 FPS.
-- **Up to 4 players** on one PS5. Each controller needs to be signed in to a
-  PS5 user; guest users work.
-- A new **PS5 Options** menu lets you remap buttons, raise the picture quality
-  (render resolution up to 4K) and pick the video output (1080p, 1440p or 4K).
-  A new video output setting takes effect the next time you start the game.
-- New home-screen icon, background art and music.
-- The hidden debug menu works too. The last button in the code is a click on
-  the left half of the touch pad.
-- This is a first release, so expect some bugs. Please report them with
-  "PS5" in the title.
-
-### Vita
+Vita only. PS5 is not supported.
 
 - Stamina mode now always plays the music for the stage you picked.
 - Brought in fixes from the upstream PC project. These fix how trophies and
-  notifications are tracked in memory, and clean up a lot of code shared with
-  the PS5 version. Your saves are not affected.
-- Behind the scenes: the automatic Vita build was broken because a download
-  server changed. It works again, and each release now builds both the Vita
-  and PS5 versions.
+  notifications are tracked in memory. Your saves are not affected.
+- The automatic Vita build works again after a download server change.
 
 ## Changes in Vita v0.8.15
 

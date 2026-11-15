@@ -2,7 +2,7 @@
 
 A native port of **Super Smash Bros. Melee (NTSC-U 1.02)** to the
 **PlayStation Vita**, developed on the
-[`vita-port` branch](https://github.com/zm2283145/melee-Vita/tree/vita-port).
+[`vita-port` branch](https://github.com/liambsulliva/melee-vita/tree/vita-port).
 
 This is not an emulator. The game code from
 [doldecomp/melee](https://github.com/doldecomp/melee) and
@@ -13,7 +13,7 @@ built with vitaShaRK).
 
 **The port is experimental.** Expect slowdowns, visual or audio issues and
 possible crashes. Back up your saves before trying a new build. Releases are
-on GitHub (current: **0.8.17**). Menus and matches are not locked to 60 fps.
+on GitHub (current: **0.8.18**). Menus and matches are not locked to 60 fps.
 One local player uses the built-in controls. Output is 960×544, with graphics
 presets and a Settings menu.
 
@@ -43,7 +43,7 @@ kubridge, and contains no DebugNet logger or GDB server.
 ### Install and run
 
 1. Download `SmashMeleevita-<version>.vpk` from a **published release** in
-   [Releases](https://github.com/zm2283145/melee-Vita/releases). The release
+   [Releases](https://github.com/liambsulliva/melee-vita/releases). The release
    VPK is built with Slippi Direct and the Settings screen. It does not
    contain a disc image.
 2. Install it with VitaShell. It uses title ID **`MLVITA002`** and appears as

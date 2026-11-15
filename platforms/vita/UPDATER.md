@@ -68,7 +68,7 @@ Every Melee VPK advertises the same title-scoped feed in
 `sce_sys/homebrew_update.ini`:
 
 ```text
-https://github.com/zm2283145/melee-Vita/releases/latest/download/MLVITA002-ver.xml
+https://github.com/liambsulliva/melee-vita/releases/latest/download/MLVITA002-ver.xml
 ```
 
 The release workflow generates `MLVITA002-ver.xml` and
@@ -95,7 +95,7 @@ builds receive the private key and create signed release assets.
 The check uses:
 
 ```text
-https://api.github.com/repos/zm2283145/melee-Vita/releases/latest
+https://api.github.com/repos/liambsulliva/melee-vita/releases/latest
 ```
 
 It runs asynchronously with a three-second connect timeout and an eight-second

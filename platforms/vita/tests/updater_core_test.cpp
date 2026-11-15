@@ -82,13 +82,13 @@ std::string valid_release_json() {
         "assets":[
             {
                 "name":"SmashMeleevita.vpk",
-                "browser_download_url":"https://github.com/zm2283145/melee-Vita/releases/download/v0.6.1/SmashMeleevita.vpk",
+                "browser_download_url":"https://github.com/liambsulliva/melee-vita/releases/download/v0.6.1/SmashMeleevita.vpk",
                 "size":1048576,
                 "state":"uploaded"
             },
             {
                 "name":"melee-update-manifest.txt",
-                "browser_download_url":"https://github.com/zm2283145/melee-Vita/releases/download/v0.6.1/melee-update-manifest.txt",
+                "browser_download_url":"https://github.com/liambsulliva/melee-vita/releases/download/v0.6.1/melee-update-manifest.txt",
                 "size":512,
                 "state":"uploaded"
             }

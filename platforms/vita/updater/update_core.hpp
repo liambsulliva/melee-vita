@@ -20,7 +20,7 @@ inline constexpr std::uint64_t kStorageReserveBytes = 16ULL * 1024ULL * 1024ULL;
 inline constexpr std::string_view kStagingRoot = "ux0:/data/melee/update/";
 inline constexpr std::string_view kManifestAssetName = "melee-update-manifest.txt";
 inline constexpr std::string_view kReleaseDownloadPrefix =
-    "https://github.com/zm2283145/melee-Vita/releases/download/";
+    "https://github.com/liambsulliva/melee-vita/releases/download/";
 
 struct SemVer {
     std::uint32_t major = 0;
