@@ -25,6 +25,9 @@ param(
     [int]$InternalResolutionScale = 100,
     [ValidateSet(0, 100, 75, 60, 50)]
     [int]$GameplayInternalResolutionScale = 0,
+    # Scaled shadow and GX copy frames and the runtime resolution setting are
+    # always built in now, so the graphics.txt resolution and its presets work
+    # on every build. These three switches are still accepted and do nothing.
     [switch]$EnableScaledShadowFrames,
     [switch]$EnableScaledGxCopyFrames,
     [switch]$EnableRuntimeResolutionMenu,
@@ -192,18 +195,6 @@ if ($GameplayInternalResolutionScale -ne 0 -and
     $InternalResolutionScale -eq 100) {
     throw '-GameplayInternalResolutionScale requires a non-native -InternalResolutionScale.'
 }
-if ($EnableScaledShadowFrames -and $InternalResolutionScale -eq 100) {
-    throw '-EnableScaledShadowFrames requires a non-native -InternalResolutionScale.'
-}
-if ($EnableScaledGxCopyFrames -and $InternalResolutionScale -eq 100) {
-    throw '-EnableScaledGxCopyFrames requires a non-native -InternalResolutionScale.'
-}
-if ($EnableRuntimeResolutionMenu -and -not $EnableScaledShadowFrames) {
-    throw '-EnableRuntimeResolutionMenu requires -EnableScaledShadowFrames.'
-}
-if ($EnableRuntimeResolutionMenu -and -not $EnableScaledGxCopyFrames) {
-    throw '-EnableRuntimeResolutionMenu requires -EnableScaledGxCopyFrames.'
-}
 if ($EnableDebugger -and $Configuration -ne 'Debug') {
     throw '-EnableDebugger requires -Configuration Debug.'
 }
@@ -323,7 +314,7 @@ $gameArchive = & (Join-Path $PSScriptRoot 'build-game.ps1') `
     -EnableModernDebugMenu:$EnableModernDebugMenu `
     -EnableDirectSnag:$EnableDirectSnag `
     -EnableRenderTrace:$EnableRenderTrace `
-    -EnableRuntimeResolutionMenu:$EnableRuntimeResolutionMenu `
+    -EnableRuntimeResolutionMenu `
     -EnableExactMath:$EnableExactMath `
     -EnableSlippi:$EnableSlippi `
     -FpContractPlugin $fpContractPlugin `
@@ -472,15 +463,11 @@ if ($GameplayInternalResolutionScale -ne 0) {
     $common += "-DMELEE_VITA_GAMEPLAY_INTERNAL_WIDTH=$gameplayInternalWidth"
     $common += "-DMELEE_VITA_GAMEPLAY_INTERNAL_HEIGHT=$gameplayInternalHeight"
 }
-if ($EnableScaledShadowFrames) {
-    $common += '-DMELEE_VITA_SCALED_SHADOW_FRAMES=1'
-}
-if ($EnableScaledGxCopyFrames) {
-    $common += '-DMELEE_VITA_SCALED_GX_COPY_FRAMES=1'
-}
-if ($EnableRuntimeResolutionMenu) {
-    $common += '-DMELEE_VITA_RUNTIME_RESOLUTION_MENU=1'
-}
+# Without these, every gameplay frame with shadows or a GX copy falls back
+# to native, so the resolution setting stays at 100%.
+$common += '-DMELEE_VITA_SCALED_SHADOW_FRAMES=1'
+$common += '-DMELEE_VITA_SCALED_GX_COPY_FRAMES=1'
+$common += '-DMELEE_VITA_RUNTIME_RESOLUTION_MENU=1'
 if ($EnableLiveProfiler) {
     $common += '-DMELEE_VITA_PROFILER=1'
     $common += "-I$(Join-Path $VitaDebuggerDirectory 'profiler/include')"

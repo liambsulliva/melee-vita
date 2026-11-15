@@ -137,30 +137,12 @@ before the render thread begins it. They never return a reduced-resolution
 success-shaped result. The periodic `[GXM]` diagnostic reports how many frames
 fell back for each reason.
 
-`-EnableScaledShadowFrames` is a separate default-off gameplay experiment that
-requires a non-native internal scale. It keeps frames containing the
-self-contained offscreen shadow pass at the selected internal resolution.
-GX-copy/readback and THP/YUV frames still fall back to native 960x544:
-
-```powershell
-.\platforms\vita\build-full.ps1 -Configuration Release -Jobs 8 `
-  -InternalResolutionScale 50 -EnableScaledShadowFrames
-```
-
-`-EnableScaledGxCopyFrames` is a further default-off gameplay experiment. It
-allows supported `GXCopyTex` frames to remain at the selected internal
-resolution, scales partial EFB clears into the internal target, and retains a
-native fallback for invalid copy bounds or unavailable copy resources:
-
-```powershell
-.\platforms\vita\build-full.ps1 -Configuration Release -Jobs 8 `
-  -InternalResolutionScale 50 -EnableScaledShadowFrames `
-  -EnableScaledGxCopyFrames
-```
-
-Readback and THP/YUV frames remain native even with both gameplay switches.
-Keep these switches separate from `-EnableShaderCacheSeal` when measuring each
-experiment.
+Every build keeps frames with the offscreen shadow pass and supported
+`GXCopyTex` copies at the selected internal resolution, scales partial EFB
+clears into the internal target, and keeps a native fallback for invalid copy
+bounds or missing copy resources. Readback and THP/YUV frames stay native.
+`-EnableScaledShadowFrames` and `-EnableScaledGxCopyFrames` are still accepted
+but do nothing.
 
 `-GameplayInternalResolutionScale` optionally selects a second internal target
 for frames containing supported GX copies or shadow passes. For example, this
@@ -169,8 +151,7 @@ gameplay-class frames at 75% (720x408):
 
 ```powershell
 .\platforms\vita\build-full.ps1 -Configuration Release -Jobs 8 `
-  -InternalResolutionScale 60 -GameplayInternalResolutionScale 75 `
-  -EnableScaledShadowFrames -EnableScaledGxCopyFrames
+  -InternalResolutionScale 60 -GameplayInternalResolutionScale 75
 ```
 
 The setting is default-off (`0`) and must differ from
@@ -178,7 +159,7 @@ The setting is default-off (`0`) and must differ from
 gameplay-class frames fall back to native resolution rather than silently using
 the menu target.
 
-`-EnableRuntimeResolutionMenu` adds separate **Menu Resolution** and
+Every build adds separate **Menu Resolution** and
 **Gameplay Resolution** selectors to the hidden Vita Debug menu and to the
 normal **Options -> Vita Options** item, which replaces the GameCube-specific
 Screen Display label and description on Vita. Vita Options opens a styled
@@ -227,15 +208,9 @@ the previous setting remains active and the failure is logged. Valid
 selections persist in `ux0:data/melee/resolution-settings.bin`; malformed
 settings are rejected in favor of the build defaults.
 
-The runtime menu is also default-off and requires both scaled-shadow and
-scaled-GX-copy support:
-
-```powershell
-.\platforms\vita\build-full.ps1 -Configuration Release -Jobs 8 `
-  -InternalResolutionScale 60 -GameplayInternalResolutionScale 75 `
-  -EnableScaledShadowFrames -EnableScaledGxCopyFrames `
-  -EnableRuntimeResolutionMenu
-```
+`-EnableRuntimeResolutionMenu` is still accepted but does nothing. Without the
+runtime menu and the scaled frames, every gameplay frame fell back to native,
+so the resolution in `graphics.txt` and its presets had no effect.
 
 Readback, THP/YUV, native movie-overlay, and unsupported GX-copy frames
 continue to force native 960x544 regardless of the live selections. Native
