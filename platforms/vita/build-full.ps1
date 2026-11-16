@@ -299,7 +299,12 @@ if ($EnableExactMath) {
         (Get-Item $pluginSource).LastWriteTimeUtc -gt (Get-Item $fpContractPlugin).LastWriteTimeUtc) {
         $pluginFlags = @('-std=gnu++17', '-shared', '-fPIC', '-fno-rtti', '-O2', "-I$pluginHeaders")
         # macOS: the plugin's GCC symbols come from cc1 when it loads.
-        if ($IsMacOS) { $pluginFlags += @('-undefined', 'dynamic_lookup') }
+        if ($IsMacOS) {
+            $pluginFlags += @('-undefined', 'dynamic_lookup')
+            foreach ($gmp in @('/opt/homebrew/include', '/usr/local/include')) {
+                if (Test-Path (Join-Path $gmp 'gmp.h')) { $pluginFlags += "-I$gmp" }
+            }
+        }
         & $HostCxx @pluginFlags $pluginSource '-o' $fpContractPlugin
         if ($LASTEXITCODE -ne 0) {
             throw "Building the FP contraction plugin failed. It needs a host C++ compiler ($HostCxx) and GMP headers (libgmp-dev, or brew install gmp)."

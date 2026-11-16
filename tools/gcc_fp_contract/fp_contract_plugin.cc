@@ -43,6 +43,15 @@
  * Compile with -ffp-contract=off and without -funsafe-math-optimizations, or
  * GCC is allowed to reorder the double maths this pass writes. */
 
+/* libc++ must be parsed before GCC's plugin headers. Those headers poison
+ * malloc and the ctype names, which libc++ still calls. */
+#include <cstdio>
+#include <cstring>
+#include <map>
+#include <set>
+#include <string>
+#include <vector>
+
 #include "gcc-plugin.h"
 #include "plugin-version.h"
 
@@ -59,13 +68,6 @@
 #include "tree-ssanames.h"
 #include "real.h"
 #include "fold-const.h"
-
-#include <cstdio>
-#include <cstring>
-#include <map>
-#include <set>
-#include <string>
-#include <vector>
 
 int plugin_is_GPL_compatible;
 
